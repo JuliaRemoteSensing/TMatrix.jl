@@ -1,4 +1,4 @@
-function general_spherical_P0ml(nmax::Int, m::Int, x::Real)
+function generalized_spherical_P0ml(nmax::Int64, m::Int64, x::T) where T <: Real
     if x < -1 || x > 1 
         error("Constraint violated: x ∈ [-1, 1]")
     end
@@ -14,8 +14,8 @@ function general_spherical_P0ml(nmax::Int, m::Int, x::Real)
     a = 1.0
     qs = √(1.0 - x * x)
     qs1 = 1.0 / qs
-    dv1 = zeros(nmax)
-    dv2 = zeros(nmax)
+    dv1 = zeros(T, nmax)
+    dv2 = zeros(T, nmax)
     if m == 0
         d1 = 1.0
         d2 = x

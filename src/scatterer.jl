@@ -12,10 +12,10 @@ Attributes:
 - `m`: The complex refractive index.
 - `a_to_c`: The ratio $a/c$ of the horizontal to rotational axes.
 """
-struct Spheroid <: AbstractScatterer
-    rev::Float64
-    m::ComplexF64
-    a_to_c::Float64
+struct Spheroid{T <: Real} <: AbstractScatterer
+    rev::T
+    m::Complex{T}
+    a_to_c::T
 end
 
 @doc raw"""
@@ -27,18 +27,16 @@ Attributes:
 - `m`: The complex refractive index.
 - `d_to_h`: The diameter-to-height ratio $D/H$.
 """
-struct Cylinder <: AbstractScatterer
-    rev::Float64
-    m::Complex{Float64}
-    d_to_h::Float64
+struct Cylinder{T <: Real} <: AbstractScatterer
+    rev::T
+    m::Complex{T}
+    d_to_h::T
 end
 
 @doc raw"""
 A Chebyshev scatterer defined by
 
-$$
-r(\theta, \phi)=r_0(1+\varepsilon T_n(\cos\theta))
-$$
+$r(\theta, \phi)=r_0(1+\varepsilon T_n(\cos\theta))$
 
 in which $T_n(\cos\theta)=\cos n\theta$.
 
@@ -49,10 +47,10 @@ Attributes:
 - `ε`: The deformation parameter.
 - `n`: The degree of the Chebyshev polynomial.
 """
-struct Chebyshev <: AbstractScatterer
-    rev::Float64
-    m::Complex{Float64}
-    ε::Float64
+struct Chebyshev{T <: Real} <: AbstractScatterer
+    rev::T
+    m::Complex{T}
+    ε::T
     n::Int64
 end
 
@@ -67,7 +65,7 @@ Parameters:
 - `m`: The complex refractive index.
 - `axis_ratio`: For spheroids, it is the ratio $a/b$ of the horizontal to rotational axes. For cylinders, it is the diameter-to-length ratio $D/L$.
 """
-function Scatterer(; r::Float64, axis_ratio::Float64, shape::Shape=SHAPE_SPHEROID, radius_type::RadiusType=RADIUS_EQUAL_VOLUME, n::Int64=2, refractive_index::ComplexF64=1.0)
+function Scatterer(; r::T, axis_ratio::T, shape::Shape=SHAPE_SPHEROID, radius_type::RadiusType=RADIUS_EQUAL_VOLUME, n::Int64=2, refractive_index::Complex{T}=1.0) where T <: Real
     if radius_type == RADIUS_EQUAL_VOLUME
         rev = r
     elseif radius_type == RADIUS_EQUAL_AREA
@@ -133,7 +131,7 @@ function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
     r = zeros(ngauss)
     dr = zeros(ngauss)
 
-    if typeof(scatterer) == Cylinder
+    if typeof(scatterer) <: Cylinder
         if ngauss % 2 != 0
             error("Constraint violated: ngauss should be even for cylinders")
         end
@@ -157,7 +155,7 @@ function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
             dr[i] = -dr[i]
         end
 
-    elseif typeof(scatterer) == Spheroid
+    elseif typeof(scatterer) <: Spheroid
         if ngauss % 2 != 0
             error("Constraint violated: ngauss should be even for spheroids")
         end
@@ -175,7 +173,7 @@ function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
             dr[ngauss + 1 - i] = -dr[i]
         end
     else
-        @assert typeof(scatterer) == Chebyshev
+        @assert typeof(scatterer) <: Chebyshev
         e = scatterer.ε
         n = scatterer.n
         dn = float(n)
