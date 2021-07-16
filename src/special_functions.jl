@@ -1,12 +1,12 @@
-function generalized_spherical_P0ml(nmax::Int64, m::Int64, x::T) where T <: Real
-    if x < -1 || x > 1 
+function generalized_spherical_P0ml(nmax::Int64, m::Int64, x::T) where {T<:Real}
+    if x < -1 || x > 1
         error("Constraint violated: x ∈ [-1, 1]")
     end
 
     if m < 0
         error("Constraint violated: m >= 0")
     end
-    
+
     if nmax <= 0
         error("Constraint violated: nmax >= 1")
     end
@@ -43,5 +43,5 @@ function generalized_spherical_P0ml(nmax::Int64, m::Int64, x::T) where T <: Real
         end
     end
 
-    dv1, dv2
+    return dv1, dv2
 end
