@@ -214,6 +214,22 @@ function vig(tm, nmax::Int64, m::Int64, x::Float64)
     dv1, dv2
 end
 
+function vigampl(tm, nmax::Int64, m::Int64, x::Float64)
+    dv1 = zeros(nmax)
+    dv2 = zeros(nmax)
+    ccall(
+        Libdl.dlsym(tm, :vigampl_),
+        Cvoid,
+        (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}),
+        x,
+        convert(Int32, nmax),
+        convert(Int32, m),
+        dv1,
+        dv2,
+    )
+    dv1, dv2
+end
+
 function cjb(tm, x::Array{ComplexF64}, n::Int64, nn::Int64)
     xr = real.(x)
     xi = imag.(x)

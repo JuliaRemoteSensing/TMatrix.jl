@@ -14,7 +14,7 @@ Attributes:
 - `m`: The complex refractive index.
 - `a_to_c`: The ratio $a/c$ of the horizontal to rotational axes.
 """
-struct Spheroid{T<:Real} <: AbstractScatterer
+struct Spheroid{T <: Real} <: AbstractScatterer
     rev::T
     m::Complex{T}
     a_to_c::T
@@ -29,7 +29,7 @@ Attributes:
 - `m`: The complex refractive index.
 - `d_to_h`: The diameter-to-height ratio $D/H$.
 """
-struct Cylinder{T<:Real} <: AbstractScatterer
+struct Cylinder{T <: Real} <: AbstractScatterer
     rev::T
     m::Complex{T}
     d_to_h::T
@@ -49,7 +49,7 @@ Attributes:
 - `ε`: The deformation parameter.
 - `n`: The degree of the Chebyshev polynomial.
 """
-struct Chebyshev{T<:Real} <: AbstractScatterer
+struct Chebyshev{T <: Real} <: AbstractScatterer
     rev::T
     m::Complex{T}
     ε::T
@@ -72,13 +72,13 @@ Parameters:
 """
 function Scatterer(;
     r::T,
-    shape::Shape = SHAPE_SPHEROID,
+    shape::Shape=SHAPE_SPHEROID,
     axis_ratio::T,
-    radius_type::RadiusType = RADIUS_EQUAL_VOLUME,
-    refractive_index::Complex{T} = 1.0,
-    n::Int64 = 2,
-    ngauss::Int64 = CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS,
-) where {T<:Real}
+    radius_type::RadiusType=RADIUS_EQUAL_VOLUME,
+    refractive_index::Complex{T}=1.0,
+    n::Int64=2,
+    ngauss::Int64=CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS,
+) where {T <: Real}
     if radius_type == RADIUS_EQUAL_VOLUME
         rev = r
     elseif radius_type == RADIUS_EQUAL_AREA
@@ -160,7 +160,7 @@ calc_tmatrix(scatterer::Scatterer, accuracy::Float64=0.001)
 
 Calculate the T-Matrix of the scatterer.
 """
-function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64 = 0.001) end
+function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64=0.001) end
 
 @doc raw"""
 ```
@@ -172,22 +172,133 @@ Calculate the amplitude matrix and the phase matrix, given the scatterer and the
 Parameters:
 
 - `scatterer`: The scatterer.
-- `tmatrix`: The pre-computed T-Matrix of the scatterer, or nothing if there is no pre-computation.
+- `α, β`: The Euler angle.
 - `ϑ_i`: The zenith angle of the incident beam.
 - `ϑ_s`: The zenith angle of the scattered beam.
 - `φ_i`: The azimuth angle of the indicent beam.
 - `φ_s`: The azimuth angle of the scatterer beam.
+- `tmatrix`: The pre-computed T-Matrix of the scatterer, or nothing if there is no pre-computation.
+
+> All the angles here are input in degrees.
 """
 function calc_amplitude(
     scatterer::AbstractScatterer,
-    tmatrix::Union{Array{Float64,2},Nothing},
-    ϑ_i::Float64,
-    φ_i::Float64,
-    ϑ_s::Float64,
-    φ_s::Float64,
-)
+    α::T,
+    β::T,
+    ϑ_i::T,
+    ϑ_s::T,
+    φ_i::T,
+    φ_s::T,
+    tmatrix::Union{Vector{Array{T,2}},Nothing},
+) where T <: Real
+    # Validate the input angles
+    @assert 0.0 <= α <= 360.0 &&  0.0 <= β <= 180.0 && 0.0 <= ϑ_i <= 180.0 && 0.0 <= ϑ_s <= 180.0 && 0.0 <= φ_i <= 360.0 && 0.0 <= φ_s <= 360.0
+
     if tmatrix === nothing
         tmatrix = calc_tmatrix(scatterer)
+    end
+
+    nmax = length(tmatrix) - 1
+
+    α *= π / 180.0
+    β *= π / 180.0
+    ϑ_i *= π / 180.0
+    ϑ_s *= π / 180.0
+    φ_i *= π / 180.0
+    φ_s *= π / 180.0
+    
+    cosβ = cos(β)
+    sinβ = sin(β)
+    cosϑ_i = cos(ϑ_i)
+    sinϑ_i = sin(ϑ_i)
+    cosφ = cos(φ_i - α)
+    sinφ = sin(φ_i - α)
+    cosϑ_p = cosϑ_i * cosβ + sinϑ_i * sinβ * cosφ
+    ϑ_p = acos(cosϑ_p)
+    cosφ_p = sinϑ_i * cosβ * cosφ - cosϑ_i * sinβ
+    sinφ_p = sinϑ_i * sinφ
+    φ_p = atan(sinφ_p, cosφ_p)
+
+    cosϑ_s = cos(ϑ_s)
+    sinϑ_s = sin(ϑ_s)
+    cosφ = cos(φ_s - α)
+    sinφ = sin(φ_s - α)
+    cosϑ_q = cosϑ_s * cosβ + sinϑ_s * sinβ * cosφ
+    ϑ_q = acos(cosϑ_q)
+    cosφ_q = sinϑ_s * cosβ * cosφ - cosϑ_s * sinβ
+    sinφ_q = sinϑ_s * sinφ
+    φ_q = atan(sinφ_q, cosφ_q)
+
+    B = zeros(T, 3, 3)
+    cosα = cos(α)
+    sinα = sin(α)
+    B[1, 1] = cosα * cosβ
+    B[1, 2] = sinα * cosβ
+    B[1, 3] = -sinβ
+    B[2, 1] = -sinα
+    B[2, 2] = cosα
+    B[2, 3] = 0.0
+    B[3, 1] = cosα * sinβ
+    B[3, 2] = sinα * sinβ
+    B[3, 3] = cosβ
+
+    AL = zeros(T, 3, 2)
+    AL1 = zeros(T, 3, 2)
+    cosφ_i = cos(φ_i)
+    sinφ_i = sin(φ_i)
+    cosφ_s = cos(φ_s)
+    sinφ_s = sin(φ_s)
+    AL[1, 1] = cosϑ_i * cosφ_i
+    AL[1, 2] = -sinϑ_i
+    AL[2, 1] = cosϑ_i * sinφ_i
+    AL[2, 2] = cosφ_i
+    AL[3, 1] = -sinϑ_i
+    AL1[1, 1] = cosϑ_s * cosφ_s
+    AL1[1, 2] = -sinϑ_s
+    AL1[2, 1] = cosϑ_s * sinφ_s
+    AL1[2, 2] = cosφ_s
+    AL1[3, 1] = -sinϑ_s
+
+    AP = zeros(T, 2, 3)
+    AP1 = zeros(T, 2, 3)
+    sinϑ_p = sin(ϑ_p)
+    cosφ_p = cos(φ_p)
+    sinφ_p = sin(φ_p)
+    sinϑ_q = sin(ϑ_q)
+    cosφ_q = cos(φ_q)
+    sinφ_q = sin(φ_q)
+    AP[1, 1] = cosϑ_p * cosφ_p
+    AP[1, 2] = cosϑ_p * sinφ_p
+    AP[1, 3] = -sinϑ_p
+    AP[2, 1] = -sinφ_p
+    AP[2, 2] = cosφ_p
+    AP1[1, 1] = cosϑ_q * cosφ_q
+    AP1[1, 2] = cosϑ_q * sinφ_q
+    AP1[1, 3] = -sinϑ_q
+    AP1[2, 1] = -sinφ_q
+    AP1[2, 2] = cosφ_q
+
+    R = AP * (B * AL)
+    R1 = AP1 * (B * AL1)
+    D = 1.0 / (R1[1, 1] * R1[2, 2] - R1[1, 2] * R1[2, 1])
+    R1 = D * [R1[2, 2] -R1[1, 2]; -R1[2, 1] R1[1, 1]]
+
+    # 可以考虑复用const中计算的结果
+    CAL = zeros(Complex{T}, nmax, nmax)
+    for i in 1:nmax
+        for j in 1:nmax
+            CAL[i, j] = (1.0im)^(i - j - 1) * √((2j + 1) * (2i + 1) / (i * j * (i + 1) * (j + 1)))
+        end
+    end
+
+    VV = Complex{T}(0.0im)
+    VH = Complex{T}(0.0im)
+    HV = Complex{T}(0.0im)
+    HH = Complex{T}(0.0im)
+    for m in 0:nmax
+        nmin = max(m, 1)
+        # dv1, dv2 = vigampl()
+        # dv01, dv02 = vigampl()
     end
 end
 
@@ -197,7 +308,7 @@ calc_S = calc_amplitude
 
 Calculate the phase matrix using the given amplitude matrix $\mathbf{S}$.
 """
-function calc_phase(S::Array{Complex{T},2}) where {T<:Real}
+function calc_phase(S::Array{Complex{T},2}) where {T <: Real}
     @assert size(S) == (2, 2)
 
     Z = zeros(T, 4, 4)

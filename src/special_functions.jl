@@ -1,6 +1,6 @@
-function generalized_spherical_P0ml(nmax::Int64, m::Int64, x::T) where {T<:Real}
-    if x < -1 || x > 1
-        error("Constraint violated: x ∈ [-1, 1]")
+function vig(nmax::Int64, m::Int64, x::T) where {T <: Real}
+    if x < -1 || x > 1 || abs(1.0 - abs(x)) < eps(x)
+        error("Constraint violated: x ∈ (-1, 1)")
     end
 
     if m < 0
@@ -43,5 +43,28 @@ function generalized_spherical_P0ml(nmax::Int64, m::Int64, x::T) where {T<:Real}
         end
     end
 
+    return dv1, dv2
+end
+
+function vigampl(nmax::Int64, m::Int64, x::T) where {T <: Real}
+    if abs(1.0 - abs(x)) < eps(x)
+        if m != 1
+            return zeros(T, nmax), zeros(T, nmax)
+        else
+            if x < 0.0
+                dv1 = [(-1)^(i + 1) * 0.5 * √(i * (i + 1)) for i in 1:nmax]
+                dv2 = -dv1
+            else
+                dv1 = [0.5 * √(i * (i + 1)) for i in 1:nmax]
+                dv2 = dv1
+            end
+
+            return dv1, dv2
+        end
+    end
+
+    dv1, dv2 = vig(nmax, m, x)
+    dv1 /= √(1.0 - x^2)
+    
     return dv1, dv2
 end
