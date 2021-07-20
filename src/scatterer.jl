@@ -160,7 +160,9 @@ calc_tmatrix(scatterer::Scatterer, accuracy::Float64=0.001)
 
 Calculate the T-Matrix of the scatterer.
 """
-function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64=0.001) end
+function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64=0.001)
+
+end
 
 @doc raw"""
 ```
@@ -206,7 +208,7 @@ function calc_amplitude(
     ϑ_s *= π / 180.0
     φ_i *= π / 180.0
     φ_s *= π / 180.0
-    
+
     cosβ = cos(β)
     sinβ = sin(β)
     cosϑ_i = cos(ϑ_i)
@@ -291,15 +293,58 @@ function calc_amplitude(
         end
     end
 
+    φ = φ_q - φ_p
     VV = Complex{T}(0.0im)
     VH = Complex{T}(0.0im)
     HV = Complex{T}(0.0im)
     HH = Complex{T}(0.0im)
     for m in 0:nmax
         nmin = max(m, 1)
-        # dv1, dv2 = vigampl()
-        # dv01, dv02 = vigampl()
+        dv1, dv2 = vigampl(nmax, m, cosϑ_p)
+        dv01, dv02 = vigampl(nmax, m, cosϑ_q)
+        fc = 2.0cos(m * φ)
+        fs = 2.0sin(m * φ)
+        for nn in nmin:nmax
+            for n in nmin:nmax
+                T11 = tmatrix[m + 1][n, nn]
+                T22 = tmatrix[m + 1][n + nmax, nn + nmax]
+                if m == 0
+                    CN = CAL[n, nn] * dv2[n] * dv02[nn]
+                    VV += CN * T22
+                    HH += CN * T11
+                else
+                    T12 = tmatrix[m + 1][n, nn + nmax]
+                    T21 = tmatrix[m + 1][n + nmax, nn]
+                    CN1 = CAL[n, nn] * fc
+                    CN2 = CAL[n, nn] * fs
+                    D11 = m^2 * dv1[n] * dv01[nn]
+                    D12 = m * dv1[n] * dv02[nn]
+                    D21 = m * dv2[n] * dv01[nn]
+                    D22 = dv2[n] * dv02[nn]
+                    VV += (T11 * D11 + T21 * D21 + T12 * D12 + T22 * D22) * CN1
+                    VH += (T11 * D12 + T21 * D22 + T12 * D11 + T22 * D21) * CN2
+                    HV -= (T11 * D21 + T21 * D11 + T12 * D22 + T22 * D12) * CN2
+                    HH += (T11 * D22 + T21 * D12 + T12 * D21 + T22 * D11) * CN1
+                end
+            end
+        end
     end
+
+    DK = 2π / λ
+    VV /= DK
+    VH /= DK
+    HV /= DK
+    HH /= DK
+    CVV = VV * R[1, 1] + VH * R[2, 1]
+    CVH = VV * R[1, 2] + VH * R[2, 2]
+    CHV = HV * R[1, 1] + HH * R[2, 1]
+    CHH = HV * R[1, 2] + HH * R[2, 2]
+    VV = R1[1, 1] * CVV + R1[1, 2] * CHV
+    VH = R1[1, 1] * CVH + R1[1, 2] * CHH
+    HV = R1[2, 1] * CVV + R1[2, 2] * CHV
+    HH = R1[2, 1] * CVH + R1[2, 2] * CHH
+
+    return [VV VH; HV HH]
 end
 
 calc_S = calc_amplitude
@@ -308,7 +353,7 @@ calc_S = calc_amplitude
 
 Calculate the phase matrix using the given amplitude matrix $\mathbf{S}$.
 """
-function calc_phase(S::Array{Complex{T},2}) where {T <: Real}
+    function calc_phase(S::Array{Complex{T},2}) where {T <: Real}
     @assert size(S) == (2, 2)
 
     Z = zeros(T, 4, 4)
@@ -341,7 +386,7 @@ calc_r(scatterer::Scatterer, ngauss::Int64)
 
 Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` points for a given scatterer.
 """
-function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
+    function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
     rev = scatterer.rev
     r = zeros(ngauss)
     dr = zeros(ngauss)
@@ -425,4 +470,33 @@ function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
     end
 
     return r, dr
+end
+
+function const_(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64) where T <: Real
+    an = [Float64(n * (n + 1)) for n in 1:nmax]
+    ann = [0.5 * √((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1))) for n1 in 1:nmax, n2 in 1:nmax]
+
+    if typeof(scatterer) <: Cylinder
+        ng = ngauss ÷ 2
+        ng1 = ng ÷ 2
+        ng2 = ng - ng1
+        x1, w1 = gausslegendre(ng1)
+        x2, w2 = gausslegendre(ng2)
+        x = zeros(ngauss)
+        w = zeros(ngauss)
+        xx = -cos(atan(scatterer.d_to_h))
+        x[1:ng1] = 0.5(xx + 1.0) * x1 .+ 0.5(xx - 1.0)
+        w[1:ng1] = 0.5(xx + 1.0) * w1
+        x[(ng1 + 1):ng] = -0.5xx * x2 .+ 0.5xx
+        w[(ng1 + 1):ng] = -0.5xx * w2
+        x[ng + 1:ngauss] = -x[ng:-1:1]
+        w[ng + 1:ngauss] = w[ng:-1:1]
+    else
+        x, w = gausslegendre(ngauss)
+    end
+
+    s = 1 ./ (sin ∘ acos).(x)
+    ss = s.^2
+
+    return x, w, an, ann, s, ss
 end

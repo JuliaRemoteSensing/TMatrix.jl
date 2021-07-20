@@ -3,14 +3,14 @@ module Wrapper
 using Libdl
 
 const NPN1 = 100
-const NPN2 = 200
-const NPN3 = 101
-const NPN4 = 100
-const NPN5 = 200
-const NPN6 = 101
-const NPL = 201
+const NPN2 = 2NPN1
+const NPN3 = NPN1 + 1
+const NPN4 = NPN1
+const NPN5 = 2NPN4
+const NPN6 = NPN4 + 1
+const NPL = NPN2 + 1
 const NPNG1 = 500
-const NPNG2 = 1000
+const NPNG2 = 2NPNG1
 
 function sarea(tm, e::Float64)
     ratio = zeros(1)
@@ -378,9 +378,6 @@ function cross_section(tm, ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ
     end
 
     for mm in 1:nmax
-        Qsc = 0.0
-        Qex = 0.0
-
         tmm, _, _ = tmatr(tm, mm, ngauss, nmax, np, e, λ, m, rev)
         nm = nmax - mm + 1
         for n2 in 1:nm
@@ -406,6 +403,81 @@ function cross_section(tm, ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ
     end
 
     return Cext, Csca, ω
+end
+
+@doc raw"""
+```
+calc_tmatrix(tm, axi::Float64, ratio::Float64, λ::Float64, m::ComplexF64, e::Float64, np::Int64, ddelt::Float64, ndgs::Int64)
+```
+
+Wrapper for the `CALCTMAT` function in Jussi Leinonen's modified version of `ampld.lp.f`.
+"""
+function calc_tmatrix(tm, axi::Float64, ratio::Float64, λ::Float64, m::ComplexF64, e::Float64, np::Int64, ddelt::Float64, ndgs::Int64)
+    nmax = zeros(Int32, 1)
+
+    ccall(
+        Libdl.dlsym(tm, :calctmat_),
+        Cvoid,
+        (Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Float64}, Ref{Int32}, Ptr{Int32}),
+        axi,
+        ratio,
+        λ,
+        real(m),
+        imag(m),
+        e,
+        convert(Int32, np),
+        ddelt,
+        convert(Int32, ndgs),
+        nmax,
+    )
+
+    tmat_ptr = cglobal(Libdl.dlsym(tm, :tmat_), UInt64)
+    blk_len = NPN6 * NPN4 * NPN4 * 4
+    RT11 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32}, tmat_ptr), (NPN6, NPN4, NPN4))
+    RT12 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len), (NPN6, NPN4, NPN4))
+    RT21 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len * 2), (NPN6, NPN4, NPN4))
+    RT22 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len * 3), (NPN6, NPN4, NPN4))
+    IT11 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len * 4), (NPN6, NPN4, NPN4))
+    IT12 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len * 5), (NPN6, NPN4, NPN4))
+    IT21 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len * 6), (NPN6, NPN4, NPN4))
+    IT22 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len * 7), (NPN6, NPN4, NPN4))
+
+    T11 = complex.(RT11, IT11)
+    T12 = complex.(RT12, IT12)
+    T21 = complex.(RT21, IT21)
+    T22 = complex.(RT22, IT22)
+
+    return T11, T12, T21, T22, Int64(nmax[1])
+end
+
+@doc raw"""
+```
+calc_amplitude(tm, nmax::Int64, λ::Float64, ϑ_i::Float64, ϑ_s::Float64, φ_i::Float64, φ_s::Float64, α::Float64, β::Float64)
+```
+
+Wrapper for the `CALCAMPL` function in Jussi Leinonen's modified version of `ampld.lp.f`. Note that `calc_tmatrix` must be called first for this function to work.
+"""
+function calc_amplitude(tm, nmax::Int64, λ::Float64, ϑ_i::Float64, ϑ_s::Float64, φ_i::Float64, φ_s::Float64, α::Float64, β::Float64)
+    S = zeros(ComplexF64, 4)
+    Z = zeros(16)
+
+    ccall(
+        Libdl.dlsym(tm, :calcampl_),
+        Cvoid,
+        (Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ptr{ComplexF64}, Ptr{Float64}),
+        convert(Int32, nmax),
+        λ,
+        ϑ_i,
+        ϑ_s,
+        φ_i,
+        φ_s,
+        α,
+        β,
+        S,
+        Z,
+    )
+
+    return reshape(S, (2, 2)), reshape(Z, (4, 4))
 end
 
 end

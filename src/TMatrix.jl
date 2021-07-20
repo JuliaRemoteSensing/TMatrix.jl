@@ -2,7 +2,7 @@ module TMatrix
 
 using FastGaussQuadrature
 
-include("special_functions.jl")
+include("helpers.jl")
 include("scatterer.jl")
 include("wrapper.jl")
 
