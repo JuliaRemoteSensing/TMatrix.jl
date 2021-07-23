@@ -13,11 +13,13 @@ Attributes:
 - `rev`: The equivalent volume radius.
 - `m`: The complex refractive index.
 - `a_to_c`: The ratio $a/c$ of the horizontal to rotational axes.
+- `λ`: The wavelength of the incident wave.
 """
-struct Spheroid{T <: Real} <: AbstractScatterer
+struct Spheroid{T<:Real} <: AbstractScatterer
     rev::T
     m::Complex{T}
     a_to_c::T
+    λ::T
 end
 
 @doc raw"""
@@ -28,11 +30,13 @@ Attributes:
 - `rev`: The equivalent volume radius.
 - `m`: The complex refractive index.
 - `d_to_h`: The diameter-to-height ratio $D/H$.
+- `λ`: The wavelength of the incident wave.
 """
-struct Cylinder{T <: Real} <: AbstractScatterer
+struct Cylinder{T<:Real} <: AbstractScatterer
     rev::T
     m::Complex{T}
     d_to_h::T
+    λ::T
 end
 
 @doc raw"""
@@ -46,14 +50,16 @@ Attributes:
 
 - `rev`: The equivalent volume radius.
 - `m`: The complex refractive index.
-- `ε`: The deformation parameter.
+- `ε`: The deformation parameter, which satisfies $0\le\varepsilon<1$.
 - `n`: The degree of the Chebyshev polynomial.
+- `λ`: The wavelength of the incident wave.
 """
-struct Chebyshev{T <: Real} <: AbstractScatterer
+struct Chebyshev{T<:Real} <: AbstractScatterer
     rev::T
     m::Complex{T}
     ε::T
     n::Int64
+    λ::T
 end
 
 @doc raw"""
@@ -72,13 +78,18 @@ Parameters:
 """
 function Scatterer(;
     r::T,
-    shape::Shape=SHAPE_SPHEROID,
+    shape::Shape = SHAPE_SPHEROID,
     axis_ratio::T,
-    radius_type::RadiusType=RADIUS_EQUAL_VOLUME,
-    refractive_index::Complex{T}=1.0,
-    n::Int64=2,
-    ngauss::Int64=CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS,
-) where {T <: Real}
+    radius_type::RadiusType = RADIUS_EQUAL_VOLUME,
+    refractive_index::Complex{T} = 1.0,
+    n::Int64 = 2,
+    ngauss::Int64 = CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS,
+    λ::T = 1.0,
+) where {T<:Real}
+    if shape == SHAPE_CHEBYSHEV && (axis_ratio < 0.0 || axis_ratio >= 1.0)
+        error("Constraint violated: Chebyshev particles should have 0≤ε<1.")
+    end
+
     if radius_type == RADIUS_EQUAL_VOLUME
         rev = r
     elseif radius_type == RADIUS_EQUAL_AREA
@@ -145,11 +156,11 @@ function Scatterer(;
     end
 
     if shape == SHAPE_SPHEROID
-        return Spheroid(rev, refractive_index, axis_ratio)
+        return Spheroid(rev, refractive_index, axis_ratio, λ)
     elseif shape == SHAPE_CYLINDER
-        return Cylinder(rev, refractive_index, axis_ratio)
+        return Cylinder(rev, refractive_index, axis_ratio, λ)
     elseif shape == SHAPE_CHEBYSHEV
-        return Chebyshev(rev, refractive_index, axis_ratio, n)
+        return Chebyshev(rev, refractive_index, axis_ratio, n, λ)
     end
 end
 
@@ -160,9 +171,7 @@ calc_tmatrix(scatterer::Scatterer, accuracy::Float64=0.001)
 
 Calculate the T-Matrix of the scatterer.
 """
-function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64=0.001)
-
-end
+function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64 = 0.001) end
 
 @doc raw"""
 ```
@@ -192,9 +201,14 @@ function calc_amplitude(
     φ_i::T,
     φ_s::T,
     tmatrix::Union{Vector{Array{T,2}},Nothing},
-) where T <: Real
+) where {T<:Real}
     # Validate the input angles
-    @assert 0.0 <= α <= 360.0 &&  0.0 <= β <= 180.0 && 0.0 <= ϑ_i <= 180.0 && 0.0 <= ϑ_s <= 180.0 && 0.0 <= φ_i <= 360.0 && 0.0 <= φ_s <= 360.0
+    @assert 0.0 <= α <= 360.0 &&
+            0.0 <= β <= 180.0 &&
+            0.0 <= ϑ_i <= 180.0 &&
+            0.0 <= ϑ_s <= 180.0 &&
+            0.0 <= φ_i <= 360.0 &&
+            0.0 <= φ_s <= 360.0
 
     if tmatrix === nothing
         tmatrix = calc_tmatrix(scatterer)
@@ -286,12 +300,10 @@ function calc_amplitude(
     R1 = D * [R1[2, 2] -R1[1, 2]; -R1[2, 1] R1[1, 1]]
 
     # 可以考虑复用const中计算的结果
-    CAL = zeros(Complex{T}, nmax, nmax)
-    for i in 1:nmax
-        for j in 1:nmax
-            CAL[i, j] = (1.0im)^(i - j - 1) * √((2j + 1) * (2i + 1) / (i * j * (i + 1) * (j + 1)))
-        end
-    end
+    CAL = [
+        Complext{T}((1.0im)^(i - j - 1) * √((2j + 1) * (2i + 1) / (i * j * (i + 1) * (j + 1)))) for i in 1:nmax,
+        j in 1:nmax
+    ]
 
     φ = φ_q - φ_p
     VV = Complex{T}(0.0im)
@@ -353,7 +365,7 @@ calc_S = calc_amplitude
 
 Calculate the phase matrix using the given amplitude matrix $\mathbf{S}$.
 """
-    function calc_phase(S::Array{Complex{T},2}) where {T <: Real}
+function calc_phase(S::Array{Complex{T},2}) where {T<:Real}
     @assert size(S) == (2, 2)
 
     Z = zeros(T, 4, 4)
@@ -379,6 +391,22 @@ end
 
 calc_Z = calc_phase
 
+function calc_SZ(
+    scatterer::AbstractScatterer,
+    α::T,
+    β::T,
+    ϑ_i::T,
+    ϑ_s::T,
+    φ_i::T,
+    φ_s::T,
+    tmatrix::Union{Vector{Array{T,2}},Nothing},
+) where {T<:Real}
+    S = calc_S(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, tmatrix)
+    Z = calc_Z(S)
+
+    return S, Z
+end
+
 @doc raw"""
 ```
 calc_r(scatterer::Scatterer, ngauss::Int64)
@@ -386,7 +414,7 @@ calc_r(scatterer::Scatterer, ngauss::Int64)
 
 Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` points for a given scatterer.
 """
-    function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
+function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
     rev = scatterer.rev
     r = zeros(ngauss)
     dr = zeros(ngauss)
@@ -472,7 +500,7 @@ Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` poi
     return r, dr
 end
 
-function const_(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64) where T <: Real
+function const_(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     an = [Float64(n * (n + 1)) for n in 1:nmax]
     ann = [0.5 * √((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1))) for n1 in 1:nmax, n2 in 1:nmax]
 
@@ -489,14 +517,45 @@ function const_(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64) where 
         w[1:ng1] = 0.5(xx + 1.0) * w1
         x[(ng1 + 1):ng] = -0.5xx * x2 .+ 0.5xx
         w[(ng1 + 1):ng] = -0.5xx * w2
-        x[ng + 1:ngauss] = -x[ng:-1:1]
-        w[ng + 1:ngauss] = w[ng:-1:1]
+        x[(ng + 1):ngauss] = -x[ng:-1:1]
+        w[(ng + 1):ngauss] = w[ng:-1:1]
     else
         x, w = gausslegendre(ngauss)
     end
 
     s = 1 ./ (sin ∘ acos).(x)
-    ss = s.^2
+    ss = s .^ 2
 
     return x, w, an, ann, s, ss
+end
+
+function vary(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
+    T = typeof(scatterer.rev)
+
+    r, dr = calc_r(scatterer, ngauss)
+    λ = scatterer.λ
+    mr = real(scatterer.m)
+    mi = imag(scatterer.m)
+    mm = mr^2 + mi^2
+    kr = 2π / λ * r
+    kr_s = scatterer.m * kr
+    rmax = maximum(r)
+    tb = max(nmax, rmax * √mm)
+    nnmax1 = Int64(floor(1.2 * √(max(rmax, nmax)) + 3.0))
+    nnmax2 = Int64(floor(tb + 4.0 * ∛tb + 1.2 * √tb - nmax + 5))
+
+    jkr = zeros(T, ngauss, nmax)
+    djkr = zeros(T, ngauss, nmax)
+    ykr = zeros(T, ngauss, nmax)
+    dykr = zeros(T, ngauss, nmax)
+    jkr_s = zeros(Complex{T}, ngauss, nmax)
+    djkr_s = zeros(Complex{T}, ngauss, nmax)
+
+    for i in 1:ngauss
+        jkr[i, :], djkr[i, :] = sphericalbesselj(kr[i], nmax, nnmax1)
+        ykr[i, :], dykr[i, :] = sphericalbessely(kr[i], nmax)
+        jkr_s[i, :], djkr_s[i, :] = sphericalbesselj(kr_s[i], nmax, nnmax2)
+    end
+
+    return r, dr, jkr, djkr, ykr, dykr, jkr_s, djkr_s
 end

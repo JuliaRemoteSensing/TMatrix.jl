@@ -1,4 +1,4 @@
-function vig(nmax::Int64, m::Int64, x::T) where {T <: Real}
+function vig(nmax::Int64, m::Int64, x::T) where {T<:Real}
     if x < -1 || x > 1 || abs(1.0 - abs(x)) < eps(x)
         error("Constraint violated: x ∈ (-1, 1)")
     end
@@ -46,7 +46,7 @@ function vig(nmax::Int64, m::Int64, x::T) where {T <: Real}
     return dv1, dv2
 end
 
-function vigampl(nmax::Int64, m::Int64, x::T) where {T <: Real}
+function vigampl(nmax::Int64, m::Int64, x::T) where {T<:Real}
     if abs(1.0 - abs(x)) < eps(x)
         if m != 1
             return zeros(T, nmax), zeros(T, nmax)
@@ -65,6 +65,45 @@ function vigampl(nmax::Int64, m::Int64, x::T) where {T <: Real}
 
     dv1, dv2 = vig(nmax, m, x)
     dv1 /= √(1.0 - x^2)
-    
+
     return dv1, dv2
+end
+
+function sphericalbesselj(x::T, nmax::Int64, nnmax1::Int64) where {T<:Number}
+    l = nmax + nnmax1
+    z = zeros(T, l)
+    x1 = 1.0 / x
+    z[l] = x / (2l + 1)
+    for i in (l - 1):-1:1
+        z[i] = 1.0 / ((2i + 1) * x1 - z[i + 1])
+    end
+    z0 = 1.0 / (x1 - z[1])
+    y0 = z0 * cos(x) * x1
+    y = zeros(T, nmax)
+    u = zeros(T, nmax)
+    y[1] = y0 * z[1]
+    u[1] = y0 - y[1] * x1
+    for i in 2:nmax
+        y[i] = y[i - 1] * z[i]
+        u[i] = y[i - 1] - y[i] * x1 * i
+    end
+
+    return y, u
+end
+
+function sphericalbessely(x::T, nmax::Int64) where {T<:Number}
+    y = zeros(T, nmax)
+    v = zeros(T, nmax)
+    x1 = 1.0 / x
+    y[1] = -cos(x) * x1^2 - sin(x) * x1
+    y[2] = (-3.0 * x1^3 + x1) * cos(x) - 3.0x1^2 * sin(x)
+    for i in 2:(nmax - 1)
+        y[i + 1] = (2i + 1) * x1 * y[i] - y[i - 1]
+    end
+    v[1] = -x1 * (cos(x) + y[1])
+    for i in 2:nmax
+        v[i] = y[i - 1] - i * x1 * y[i]
+    end
+
+    return y, v
 end

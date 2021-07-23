@@ -14,38 +14,19 @@ const NPNG2 = 2NPNG1
 
 function sarea(tm, e::Float64)
     ratio = zeros(1)
-    ccall(
-        Libdl.dlsym(tm, :sarea_),
-        Cvoid,
-        (Ref{Float64}, Ptr{Float64}),
-        e,
-        ratio,
-    )
+    ccall(Libdl.dlsym(tm, :sarea_), Cvoid, (Ref{Float64}, Ptr{Float64}), e, ratio)
     return ratio[1]
 end
 
 function sareac(tm, e::Float64)
     ratio = zeros(1)
-    ccall(
-        Libdl.dlsym(tm, :sareac_),
-        Cvoid,
-        (Ref{Float64}, Ptr{Float64}),
-        e,
-        ratio,
-    )
+    ccall(Libdl.dlsym(tm, :sareac_), Cvoid, (Ref{Float64}, Ptr{Float64}), e, ratio)
     return ratio[1]
 end
 
 function surfch(tm, n::Int64, e::Float64)
     ratio = zeros(1)
-    ccall(
-        Libdl.dlsym(tm, :surfch_),
-        Cvoid,
-        (Ref{Int32}, Ref{Float64}, Ptr{Float64}),
-        convert(Int32, n),
-        e,
-        ratio,
-    )
+    ccall(Libdl.dlsym(tm, :surfch_), Cvoid, (Ref{Int32}, Ref{Float64}, Ptr{Float64}), convert(Int32, n), e, ratio)
     return ratio[1]
 end
 
@@ -142,7 +123,20 @@ function const_(tm, ngauss::Int64, nmax::Int64, np::Int64, e::Float64)
     ccall(
         Libdl.dlsym(tm, :const_),
         Cvoid,
-        (Ref{Int32}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ref{Float64}),
+        (
+            Ref{Int32},
+            Ref{Int32},
+            Ref{Int32},
+            Ref{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ref{Int32},
+            Ref{Float64},
+        ),
         convert(Int32, ngauss ÷ 2),
         convert(Int32, nmax),
         convert(Int32, nmax),
@@ -159,7 +153,17 @@ function const_(tm, ngauss::Int64, nmax::Int64, np::Int64, e::Float64)
     return x, w, an, ann, s, ss
 end
 
-function vary(tm, x::Array{Float64}, λ::Float64, m::ComplexF64, rev::Float64, e::Float64, np::Int64, ngauss::Int64, nmax::Int64)
+function vary(
+    tm,
+    x::Array{Float64},
+    λ::Float64,
+    m::ComplexF64,
+    rev::Float64,
+    e::Float64,
+    np::Int64,
+    ngauss::Int64,
+    nmax::Int64,
+)
     mrr = real(m)
     mri = imag(m)
     p = float(π)
@@ -174,7 +178,26 @@ function vary(tm, x::Array{Float64}, λ::Float64, m::ComplexF64, rev::Float64, e
     ccall(
         Libdl.dlsym(tm, :vary_),
         Cvoid,
-        (Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ref{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}),
+        (
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Int32},
+            Ref{Int32},
+            Ptr{Float64},
+            Ref{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ref{Int32},
+        ),
         λ,
         mrr,
         mri,
@@ -195,7 +218,20 @@ function vary(tm, x::Array{Float64}, λ::Float64, m::ComplexF64, rev::Float64, e
         convert(Int32, nmax),
     )
 
-    return ppi, pir, pii, r, dr, ddr, drr, dri
+    cbess_ptr = cglobal(Libdl.dlsym(tm, :cbess_), UInt64)
+    blk_len = NPNG2 * NPN1 * 8
+    jkr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr), (NPNG2, NPN1))[1:ngauss,1:nmax]
+    ykr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len), (NPNG2, NPN1))[1:ngauss,1:nmax]
+    jkr_sr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len * 2), (NPNG2, NPN1))[1:ngauss,1:nmax]
+    jkr_si = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len * 3), (NPNG2, NPN1))[1:ngauss,1:nmax]
+    djkr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len * 4), (NPNG2, NPN1))[1:ngauss,1:nmax]
+    dykr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len * 5), (NPNG2, NPN1))[1:ngauss,1:nmax]
+    djkr_sr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len * 6), (NPNG2, NPN1))[1:ngauss,1:nmax]
+    djkr_si = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len * 7), (NPNG2, NPN1))[1:ngauss,1:nmax]
+    jkr_s = complex.(jkr_sr, jkr_si)
+    djkr_s = complex.(djkr_sr, djkr_si)
+
+    return ppi, pir, pii, r, dr, ddr, drr, dri, jkr, djkr, ykr, dykr, jkr_s, djkr_s
 end
 
 function vig(tm, nmax::Int64, m::Int64, x::Float64)
@@ -211,7 +247,7 @@ function vig(tm, nmax::Int64, m::Int64, x::Float64)
         dv1,
         dv2,
     )
-    dv1, dv2
+    return dv1, dv2
 end
 
 function vigampl(tm, nmax::Int64, m::Int64, x::Float64)
@@ -227,12 +263,45 @@ function vigampl(tm, nmax::Int64, m::Int64, x::Float64)
         dv1,
         dv2,
     )
-    dv1, dv2
+    return dv1, dv2
 end
 
-function cjb(tm, x::Array{ComplexF64}, n::Int64, nn::Int64)
-    xr = real.(x)
-    xi = imag.(x)
+function rjb(tm, x::Float64, n::Int64, nn::Int64)
+    y = zeros(n)
+    u = zeros(n)
+    ccall(
+        Libdl.dlsym(tm, :rjb_),
+        Cvoid,
+        (Ref{Float64}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ref{Int32}),
+        x,
+        y,
+        u,
+        convert(Int32, n),
+        convert(Int32, nn),
+    )
+
+    return y, u
+end
+
+function ryb(tm, x::Float64, n::Int64)
+    y = zeros(n)
+    u = zeros(n)
+    ccall(
+        Libdl.dlsym(tm, :ryb_),
+        Cvoid,
+        (Ref{Float64}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}),
+        x,
+        y,
+        u,
+        convert(Int32, n),
+    )
+
+    return y, u
+end
+
+function cjb(tm, x::ComplexF64, n::Int64, nn::Int64)
+    xr = real(x)
+    xi = imag(x)
     yr = zeros(n)
     yi = zeros(n)
     ur = zeros(n)
@@ -258,7 +327,7 @@ end
 
 function tmatr0(tm, ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ::Float64, m::ComplexF64, rev::Float64)
     x, w, an, ann, s, ss = const_(tm, ngauss, nmax, np, e)
-    ppi, pir, pii, r, dr, ddr, drr, dri = vary(tm, x, λ, m, rev, e, np, ngauss, nmax)
+    ppi, pir, pii, r, dr, ddr, drr, dri, _ = vary(tm, x, λ, m, rev, e, np, ngauss, nmax)
 
     ncheck = zeros(Int32, 1)
 
@@ -269,7 +338,25 @@ function tmatr0(tm, ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ::Float
     ccall(
         Libdl.dlsym(tm, :tmatr0_),
         Cvoid,
-        (Ref{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ptr{Int32}),
+        (
+            Ref{Int32},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ref{Int32},
+            Ptr{Int32},
+        ),
         convert(Int32, ngauss ÷ 2),
         x,
         w,
@@ -291,25 +378,37 @@ function tmatr0(tm, ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ::Float
 
     ctt_ptr = cglobal(Libdl.dlsym(tm, :ctt_), UInt64)
     blk_len = NPN2 * NPN2 * 8
-    qr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr), (NPN2, NPN2))[1:2nmax,1:2nmax]
-    qi = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr + blk_len), (NPN2, NPN2))[1:2nmax,1:2nmax]
-    rgqr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr + blk_len * 2), (NPN2, NPN2))[1:2nmax,1:2nmax]
-    rgqi = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr + blk_len * 3), (NPN2, NPN2))[1:2nmax,1:2nmax]
+    qr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr), (NPN2, NPN2))[1:(2nmax), 1:(2nmax)]
+    qi = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr + blk_len), (NPN2, NPN2))[1:(2nmax), 1:(2nmax)]
+    rgqr =
+        unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr + blk_len * 2), (NPN2, NPN2))[1:(2nmax), 1:(2nmax)]
+    rgqi =
+        unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr + blk_len * 3), (NPN2, NPN2))[1:(2nmax), 1:(2nmax)]
     q = complex.(qr, qi)
     rgq = complex.(rgqr, rgqi)
 
     ct_ptr = cglobal(Libdl.dlsym(tm, :ct_), UInt64)
-    tr1 = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ct_ptr), (NPN2, NPN2))[1:2nmax,1:2nmax]
-    ti1 = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ct_ptr + blk_len), (NPN2, NPN2))[1:2nmax,1:2nmax]
+    tr1 = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ct_ptr), (NPN2, NPN2))[1:(2nmax), 1:(2nmax)]
+    ti1 = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ct_ptr + blk_len), (NPN2, NPN2))[1:(2nmax), 1:(2nmax)]
 
     t = complex.(tr1, ti1)
 
     return t, q, rgq
 end
 
-function tmatr(tm, mm::Int64, ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ::Float64, m::ComplexF64, rev::Float64)
+function tmatr(
+    tm,
+    mm::Int64,
+    ngauss::Int64,
+    nmax::Int64,
+    np::Int64,
+    e::Float64,
+    λ::Float64,
+    m::ComplexF64,
+    rev::Float64,
+)
     x, w, an, ann, s, ss = const_(tm, ngauss, nmax, np, e)
-    ppi, pir, pii, r, dr, ddr, drr, dri = vary(tm, x, λ, m, rev, e, np, ngauss, nmax)
+    ppi, pir, pii, r, dr, ddr, drr, dri, _ = vary(tm, x, λ, m, rev, e, np, ngauss, nmax)
 
     ncheck = zeros(Int32, 1)
 
@@ -320,7 +419,26 @@ function tmatr(tm, mm::Int64, ngauss::Int64, nmax::Int64, np::Int64, e::Float64,
     ccall(
         Libdl.dlsym(tm, :tmatr_),
         Cvoid,
-        (Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ptr{Int32}),
+        (
+            Ref{Int32},
+            Ref{Int32},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ptr{Float64},
+            Ref{Int32},
+            Ptr{Int32},
+        ),
         convert(Int32, mm),
         convert(Int32, ngauss ÷ 2),
         x,
@@ -344,10 +462,10 @@ function tmatr(tm, mm::Int64, ngauss::Int64, nmax::Int64, np::Int64, e::Float64,
     ctt_ptr = cglobal(Libdl.dlsym(tm, :ctt_), UInt64)
     blk_len = NPN2 * NPN2 * 8
     nm = nmax - mm + 1
-    qr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr), (NPN2, NPN2))[1:2nm,1:2nm]
-    qi = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr + blk_len), (NPN2, NPN2))[1:2nm,1:2nm]
-    rgqr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr + blk_len * 2), (NPN2, NPN2))[1:2nm,1:2nm]
-    rgqi = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr + blk_len * 3), (NPN2, NPN2))[1:2nm,1:2nm]
+    qr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr), (NPN2, NPN2))[1:(2nm), 1:(2nm)]
+    qi = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr + blk_len), (NPN2, NPN2))[1:(2nm), 1:(2nm)]
+    rgqr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr + blk_len * 2), (NPN2, NPN2))[1:(2nm), 1:(2nm)]
+    rgqi = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr + blk_len * 3), (NPN2, NPN2))[1:(2nm), 1:(2nm)]
 
     q = complex.(qr, qi)
     rgq = complex.(rgqr, rgqi)
@@ -370,10 +488,14 @@ function cross_section(tm, ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ
         nn2 = n2 + nmax
         for n1 in 1:nmax
             nn1 = n1 + nmax
-            Qsca += t0[n1, n2] * t0[n1, n2]' + t0[n1, nn2] * t0[n1, nn2]' + t0[nn1, n2] * t0[nn1, n2]' + t0[nn1, nn2] * t0[nn1, nn2]'
+            Qsca +=
+                t0[n1, n2] * t0[n1, n2]' +
+                t0[n1, nn2] * t0[n1, nn2]' +
+                t0[nn1, n2] * t0[nn1, n2]' +
+                t0[nn1, nn2] * t0[nn1, nn2]'
         end
     end
-    for n in 1:2nmax
+    for n in 1:(2nmax)
         Qext += real(t0[n, n])
     end
 
@@ -384,11 +506,17 @@ function cross_section(tm, ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ
             nn2 = n2 + nm
             for n1 in 1:nm
                 nn1 = n1 + nm
-                Qsca += (tmm[n1, n2] * tmm[n1, n2]' + tmm[n1, nn2] * tmm[n1, nn2]' + tmm[nn1, n2] * tmm[nn1, n2]' + tmm[nn1, nn2] * tmm[nn1, nn2]') * 2.0
+                Qsca +=
+                    (
+                        tmm[n1, n2] * tmm[n1, n2]' +
+                        tmm[n1, nn2] * tmm[n1, nn2]' +
+                        tmm[nn1, n2] * tmm[nn1, n2]' +
+                        tmm[nn1, nn2] * tmm[nn1, nn2]'
+                    ) * 2.0
             end
         end
 
-        for n in 1:2nm
+        for n in 1:(2nm)
             Qext += real(tmm[n, n]) * 2.0
         end
     end
@@ -412,13 +540,34 @@ calc_tmatrix(tm, axi::Float64, ratio::Float64, λ::Float64, m::ComplexF64, e::Fl
 
 Wrapper for the `CALCTMAT` function in Jussi Leinonen's modified version of `ampld.lp.f`.
 """
-function calc_tmatrix(tm, axi::Float64, ratio::Float64, λ::Float64, m::ComplexF64, e::Float64, np::Int64, ddelt::Float64, ndgs::Int64)
+function calc_tmatrix(
+    tm,
+    axi::Float64,
+    ratio::Float64,
+    λ::Float64,
+    m::ComplexF64,
+    e::Float64,
+    np::Int64,
+    ddelt::Float64,
+    ndgs::Int64,
+)
     nmax = zeros(Int32, 1)
 
     ccall(
         Libdl.dlsym(tm, :calctmat_),
         Cvoid,
-        (Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ref{Float64}, Ref{Int32}, Ptr{Int32}),
+        (
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Int32},
+            Ref{Float64},
+            Ref{Int32},
+            Ptr{Int32},
+        ),
         axi,
         ratio,
         λ,
@@ -434,13 +583,13 @@ function calc_tmatrix(tm, axi::Float64, ratio::Float64, λ::Float64, m::ComplexF
     tmat_ptr = cglobal(Libdl.dlsym(tm, :tmat_), UInt64)
     blk_len = NPN6 * NPN4 * NPN4 * 4
     RT11 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32}, tmat_ptr), (NPN6, NPN4, NPN4))
-    RT12 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len), (NPN6, NPN4, NPN4))
-    RT21 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len * 2), (NPN6, NPN4, NPN4))
-    RT22 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len * 3), (NPN6, NPN4, NPN4))
-    IT11 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len * 4), (NPN6, NPN4, NPN4))
-    IT12 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len * 5), (NPN6, NPN4, NPN4))
-    IT21 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len * 6), (NPN6, NPN4, NPN4))
-    IT22 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32},  tmat_ptr + blk_len * 7), (NPN6, NPN4, NPN4))
+    RT12 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32}, tmat_ptr + blk_len), (NPN6, NPN4, NPN4))
+    RT21 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32}, tmat_ptr + blk_len * 2), (NPN6, NPN4, NPN4))
+    RT22 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32}, tmat_ptr + blk_len * 3), (NPN6, NPN4, NPN4))
+    IT11 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32}, tmat_ptr + blk_len * 4), (NPN6, NPN4, NPN4))
+    IT12 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32}, tmat_ptr + blk_len * 5), (NPN6, NPN4, NPN4))
+    IT21 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32}, tmat_ptr + blk_len * 6), (NPN6, NPN4, NPN4))
+    IT22 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32}, tmat_ptr + blk_len * 7), (NPN6, NPN4, NPN4))
 
     T11 = complex.(RT11, IT11)
     T12 = complex.(RT12, IT12)
@@ -457,14 +606,35 @@ calc_amplitude(tm, nmax::Int64, λ::Float64, ϑ_i::Float64, ϑ_s::Float64, φ_i:
 
 Wrapper for the `CALCAMPL` function in Jussi Leinonen's modified version of `ampld.lp.f`. Note that `calc_tmatrix` must be called first for this function to work.
 """
-function calc_amplitude(tm, nmax::Int64, λ::Float64, ϑ_i::Float64, ϑ_s::Float64, φ_i::Float64, φ_s::Float64, α::Float64, β::Float64)
+function calc_amplitude(
+    tm,
+    nmax::Int64,
+    λ::Float64,
+    ϑ_i::Float64,
+    ϑ_s::Float64,
+    φ_i::Float64,
+    φ_s::Float64,
+    α::Float64,
+    β::Float64,
+)
     S = zeros(ComplexF64, 4)
     Z = zeros(16)
 
     ccall(
         Libdl.dlsym(tm, :calcampl_),
         Cvoid,
-        (Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ref{Float64}, Ptr{ComplexF64}, Ptr{Float64}),
+        (
+            Ref{Int32},
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Float64},
+            Ptr{ComplexF64},
+            Ptr{Float64},
+        ),
         convert(Int32, nmax),
         λ,
         ϑ_i,
