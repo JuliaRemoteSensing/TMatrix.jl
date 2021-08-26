@@ -7,14 +7,13 @@ version = "0.1.0"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
-SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
-WignerD = "87c4ff3e-34df-11e9-37a7-516cea4e0402"
 
 [compat]
 julia = "1.6"
 
 [extras]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]

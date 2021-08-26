@@ -1,20 +1,16 @@
 using TMatrix
 using TMatrix.Wrapper
-using Libdl
 using Test
 
 @testset "TMatrix.jl" begin
-    tm = Libdl.dlopen("../shared/tmatrix.so")
-
     @testset "Calculate vig function" begin
         @testset "vig($nmax, $m, $x)" for (nmax, m, x) in [
             (nmax, m, x) for nmax in [5, 10, 100], m in [0, 1, 2, 3], x in [-0.9, -0.5, -0.1, 0.1, 0.5, 0.9]
         ]
             @test begin
-                dv10, dv20 = TMatrix.Wrapper.vig(tm, nmax, m, x)
+                dv10, dv20 = TMatrix.Wrapper.vig(nmax, m, x)
                 dv1, dv2 = TMatrix.vig(nmax, m, x)
-                dv1 ≈ dv10
-                dv2 ≈ dv20
+                dv1 ≈ dv10 && dv2 ≈ dv20
             end
         end
     end
@@ -24,10 +20,9 @@ using Test
             (nmax, m, x) for nmax in [5, 10, 100], m in [0, 1, 2, 3], x in [-1.0, -0.5, -0.1, 0.1, 0.5, 1.0]
         ]
             @test begin
-                dv10, dv20 = TMatrix.Wrapper.vigampl(tm, nmax, m, x)
+                dv10, dv20 = TMatrix.Wrapper.vigampl(nmax, m, x)
                 dv1, dv2 = TMatrix.vigampl(nmax, m, x)
-                dv1 ≈ dv10
-                dv2 ≈ dv20
+                dv1 ≈ dv10 && dv2 ≈ dv20
             end
         end
     end
@@ -49,7 +44,7 @@ using Test
                     refractive_index = m,
                     axis_ratio = a_to_c,
                 )
-                r2, drr = TMatrix.Wrapper.rsp1(tm, ngauss, rev, a_to_c)
+                r2, drr = TMatrix.Wrapper.rsp1(ngauss, rev, a_to_c)
                 r, dr = TMatrix.calc_r(scatterer, ngauss)
 
                 r .^ 2 ≈ r2 && dr ./ r ≈ drr
@@ -72,7 +67,7 @@ using Test
                     refractive_index = m,
                     axis_ratio = d_to_h,
                 )
-                r2, drr = TMatrix.Wrapper.rsp3(tm, ngauss, rev, d_to_h)
+                r2, drr = TMatrix.Wrapper.rsp3(ngauss, rev, d_to_h)
                 r, dr = TMatrix.calc_r(scatterer, ngauss)
 
                 r .^ 2 ≈ r2 && dr ./ r ≈ drr
@@ -87,7 +82,7 @@ using Test
             ncheb,
         ) in [
             (rev, m, ε, ngauss, ncheb) for rev in [0.5, 1.0, 2.0], m in [1.0, 0.9 + 0.001im, 1.1 - 0.001im],
-            ε in [0.0, 0.1, 0.5, 0.9], ngauss in [4, 20, 1000], ncheb in [2, 3, 4, 10]
+            ε in [0.0, 0.1, 0.5], ngauss in [4, 20, 1000], ncheb in [2, 3, 4, 10]
         ]
             @test begin
                 scatterer = TMatrix.Scatterer(
@@ -97,7 +92,7 @@ using Test
                     axis_ratio = ε,
                     n = ncheb,
                 )
-                r2, drr = TMatrix.Wrapper.rsp2(tm, ngauss, rev, ε, ncheb)
+                r2, drr = TMatrix.Wrapper.rsp2(ngauss, rev, ε, ncheb)
                 r, dr = TMatrix.calc_r(scatterer, ngauss)
 
                 r .^ 2 ≈ r2 && dr ./ r ≈ drr
@@ -118,7 +113,7 @@ using Test
                     axis_ratio = a_to_c,
                 )
                 rev = scatterer.rev
-                ratio = TMatrix.Wrapper.sarea(tm, a_to_c)
+                ratio = TMatrix.Wrapper.sarea(a_to_c)
                 rev ≈ rea * ratio
             end
         end
@@ -135,13 +130,13 @@ using Test
                     axis_ratio = d_to_h,
                 )
                 rev = scatterer.rev
-                ratio = TMatrix.Wrapper.sareac(tm, d_to_h)
+                ratio = TMatrix.Wrapper.sareac(d_to_h)
                 rev ≈ rea * ratio
             end
         end
 
         @testset "for Chebyshev particles with rea = $rea, ε = $ε and ncheb = $ncheb" for (rea, ε, ncheb) in [
-            (rea, ε, ncheb) for rea in [0.5, 1.0, 2.0], ε in [0.0, 0.1, 0.5, 0.9], ncheb in [2, 3, 4, 10]
+            (rea, ε, ncheb) for rea in [0.5, 1.0, 2.0], ε in [0.0, 0.1, 0.5], ncheb in [2, 3, 4, 10]
         ]
             @test begin
                 scatterer = TMatrix.Scatterer(
@@ -153,7 +148,7 @@ using Test
                     n = ncheb,
                 )
                 rev = scatterer.rev
-                ratio = TMatrix.Wrapper.surfch(tm, ncheb, ε)
+                ratio = TMatrix.Wrapper.surfch(ncheb, ε)
                 rev ≈ rea * ratio
             end
         end
@@ -172,8 +167,8 @@ using Test
                     axis_ratio = a_to_c,
                 )
 
-                ngauss = nmax * 2
-                x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.const_(tm, ngauss, nmax, -1, a_to_c)
+                ngauss = nmax * 4
+                x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.const_(ngauss, nmax, -1, a_to_c)
                 x0 = x0[1:ngauss]
                 w0 = w0[1:ngauss]
                 an0 = an0[1:nmax]
@@ -197,8 +192,8 @@ using Test
                     axis_ratio = d_to_h,
                 )
 
-                ngauss = nmax * 2
-                x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.const_(tm, ngauss, nmax, -2, d_to_h)
+                ngauss = nmax * 4
+                x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.const_(ngauss, nmax, -2, d_to_h)
                 x0 = x0[1:ngauss]
                 w0 = w0[1:ngauss]
                 an0 = an0[1:nmax]
@@ -211,7 +206,7 @@ using Test
         end
 
         @testset "for Chebyshev particles with ε = $ε, ncheb = $ncheb and nmax = $nmax" for (ε, ncheb, nmax) in [
-            (ε, ncheb, nmax) for ε in [0.0, 0.1, 0.5, 0.9], ncheb in [2, 3, 4, 10], nmax in [4, 10, 20]
+            (ε, ncheb, nmax) for ε in [0.0, 0.1, 0.5], ncheb in [2, 3, 4, 10], nmax in [4, 10, 20]
         ]
             @test begin
                 scatterer = TMatrix.Scatterer(
@@ -223,8 +218,8 @@ using Test
                     n = ncheb,
                 )
 
-                ngauss = nmax * 2
-                x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.const_(tm, ngauss, nmax, ncheb, ε)
+                ngauss = nmax * 4
+                x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.const_(ngauss, nmax, ncheb, ε)
                 x0 = x0[1:ngauss]
                 w0 = w0[1:ngauss]
                 an0 = an0[1:nmax]
@@ -243,7 +238,7 @@ using Test
         @testset "Spherical Bessel j for real numbers (rjb)" for x in
                                                                  [-10.0, -1.5, -1.0, -0.5, 0.01, 0.5, 1.0, 1.5, 10.0]
             @test begin
-                y0, u0 = TMatrix.Wrapper.rjb(tm, x, nmax, nnmax)
+                y0, u0 = TMatrix.Wrapper.rjb(x, nmax, nnmax)
                 y, u = TMatrix.sphericalbesselj(x, nmax, nnmax)
                 y ≈ y0 && u ≈ u0
             end
@@ -261,7 +256,7 @@ using Test
             10.0,
         ]
             @test begin
-                y0, u0 = TMatrix.Wrapper.cjb(tm, x, nmax, nnmax)
+                y0, u0 = TMatrix.Wrapper.cjb(x, nmax, nnmax)
                 y, u = TMatrix.sphericalbesselj(x, nmax, nnmax)
                 y ≈ y0 && u ≈ u0
             end
@@ -270,7 +265,7 @@ using Test
         @testset "Spherical Bessel y for real numbers (ryb)" for x in
                                                                  [-10.0, -1.5, -1.0, -0.5, 0.01, 0.5, 1.0, 1.5, 10.0]
             @test begin
-                y0, u0 = TMatrix.Wrapper.ryb(tm, x, nmax)
+                y0, u0 = TMatrix.Wrapper.ryb(x, nmax)
                 y, u = TMatrix.sphericalbessely(x, nmax)
                 y ≈ y0 && u ≈ u0
             end
@@ -282,7 +277,7 @@ using Test
         m = 1.5 + 0.02im
         rev = 1.0
         nmax = 50
-        ngauss = nmax * 2
+        ngauss = nmax * 4
 
         @testset "for spheroids with a_to_c = $a_to_c" for a_to_c in [0.5, 1.0, 2.0]
             @test begin
@@ -292,15 +287,23 @@ using Test
                     radius_type = TMatrix.RADIUS_EQUAL_VOLUME,
                     refractive_index = m,
                     axis_ratio = a_to_c,
+                    λ = λ,
                 )
 
                 np = -1
-                x, _ = TMatrix.Wrapper.const_(tm, ngauss, nmax, np, a_to_c)
-                _, _, _, _, _, _, _, _, jkr0, djkr0, ykr0, dykr0, jkr_s0, djkr_s0 =
-                    TMatrix.Wrapper.vary(tm, x, λ, m, rev, a_to_c, np, ngauss, nmax)
-                _, _, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
+                x, _ = TMatrix.Wrapper.const_(ngauss, nmax, np, a_to_c)
+                _, _, _, _, _, ddr, drr, dri, jkr0, djkr0, ykr0, dykr0, jkr_s0, djkr_s0 =
+                    TMatrix.Wrapper.vary(x, λ, m, rev, a_to_c, np, ngauss, nmax)
+                _, _, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
 
-                jkr0 ≈ jkr && djkr0 ≈ djkr && ykr0 ≈ ykr && dykr0 ≈ dykr && jkr_s0 ≈ jkr_s && djkr_s0 ≈ djkr_s
+                ddr[1:ngauss] ≈ kr1 &&
+                    (drr + 1.0im * dri)[1:ngauss] ≈ kr_s1 &&
+                    jkr0 ≈ jkr &&
+                    djkr0 ≈ djkr &&
+                    ykr0 ≈ ykr &&
+                    dykr0 ≈ dykr &&
+                    jkr_s0 ≈ jkr_s &&
+                    djkr_s0 ≈ djkr_s
             end
         end
 
@@ -312,20 +315,28 @@ using Test
                     radius_type = TMatrix.RADIUS_EQUAL_VOLUME,
                     refractive_index = m,
                     axis_ratio = d_to_h,
+                    λ = λ,
                 )
 
                 np = -2
-                x, _ = TMatrix.Wrapper.const_(tm, ngauss, nmax, np, d_to_h)
-                _, _, _, _, _, _, _, _, jkr0, djkr0, ykr0, dykr0, jkr_s0, djkr_s0 =
-                    TMatrix.Wrapper.vary(tm, x, λ, m, rev, d_to_h, np, ngauss, nmax)
-                _, _, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
+                x, _ = TMatrix.Wrapper.const_(ngauss, nmax, np, d_to_h)
+                _, _, _, _, _, ddr, drr, dri, jkr0, djkr0, ykr0, dykr0, jkr_s0, djkr_s0 =
+                    TMatrix.Wrapper.vary(x, λ, m, rev, d_to_h, np, ngauss, nmax)
+                _, _, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
 
-                jkr0 ≈ jkr && djkr0 ≈ djkr && ykr0 ≈ ykr && dykr0 ≈ dykr && jkr_s0 ≈ jkr_s && djkr_s0 ≈ djkr_s
+                ddr[1:ngauss] ≈ kr1 &&
+                    (drr + 1.0im * dri)[1:ngauss] ≈ kr_s1 &&
+                    jkr0 ≈ jkr &&
+                    djkr0 ≈ djkr &&
+                    ykr0 ≈ ykr &&
+                    dykr0 ≈ dykr &&
+                    jkr_s0 ≈ jkr_s &&
+                    djkr_s0 ≈ djkr_s
             end
         end
 
         @testset "for Chebyshev particles with ε = $ε and ncheb = $ncheb" for (ε, ncheb) in [
-            (ε, ncheb) for ε in [0.0, 0.1, 0.5, 0.9], ncheb in [2, 3, 4, 10]
+            (ε, ncheb) for ε in [0.0, 0.1, 0.5], ncheb in [2, 3, 4, 10]
         ]
             @test begin
                 scatterer = TMatrix.Scatterer(
@@ -335,15 +346,207 @@ using Test
                     refractive_index = m,
                     axis_ratio = ε,
                     n = ncheb,
+                    λ = λ,
                 )
 
                 np = ncheb
-                x, _ = TMatrix.Wrapper.const_(tm, ngauss, nmax, np, ε)
-                _, _, _, _, _, _, _, _, jkr0, djkr0, ykr0, dykr0, jkr_s0, djkr_s0 =
-                    TMatrix.Wrapper.vary(tm, x, λ, m, rev, ε, np, ngauss, nmax)
-                _, _, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
+                x, _ = TMatrix.Wrapper.const_(ngauss, nmax, np, ε)
+                _, _, _, _, _, ddr, drr, dri, jkr0, djkr0, ykr0, dykr0, jkr_s0, djkr_s0 =
+                    TMatrix.Wrapper.vary(x, λ, m, rev, ε, np, ngauss, nmax)
+                _, _, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
 
-                jkr0 ≈ jkr && djkr0 ≈ djkr && ykr0 ≈ ykr && dykr0 ≈ dykr && jkr_s0 ≈ jkr_s && djkr_s0 ≈ djkr_s
+                ddr[1:ngauss] ≈ kr1 &&
+                    (drr + 1.0im * dri)[1:ngauss] ≈ kr_s1 &&
+                    jkr0 ≈ jkr &&
+                    djkr0 ≈ djkr &&
+                    ykr0 ≈ ykr &&
+                    dykr0 ≈ dykr &&
+                    jkr_s0 ≈ jkr_s &&
+                    djkr_s0 ≈ djkr_s
+            end
+        end
+    end
+
+    @testset "Calculate sub T-Matrix" begin
+        λ = 1.0
+        m = 1.5 + 0.02im
+        rev = 1.0
+        nmax = 20
+        ngauss = nmax * 4
+
+        @testset "for spheroids with a_to_c = $a_to_c" for a_to_c in [0.5, 1.0, 2.0]
+            @test begin
+                scatterer = TMatrix.Scatterer(
+                    r = rev,
+                    shape = TMatrix.SHAPE_SPHEROID,
+                    radius_type = TMatrix.RADIUS_EQUAL_VOLUME,
+                    refractive_index = m,
+                    axis_ratio = a_to_c,
+                    λ = λ,
+                )
+
+                np = -1
+                valid = true
+                for mm in 0:nmax
+                    if mm == 0
+                        T0, _ = TMatrix.Wrapper.tmatr0(ngauss, nmax, np, a_to_c, λ, m, rev)
+                    else
+                        T0, _ = TMatrix.Wrapper.tmatr(mm, ngauss, nmax, np, a_to_c, λ, m, rev)
+                    end
+                    T, _ = TMatrix.tmatr(scatterer, mm, ngauss, nmax)
+                    if !(T ≈ T0)
+                        valid = false
+                        break
+                    end
+                end
+
+                valid
+            end
+        end
+
+        @testset "for cylinders with d_to_h = $d_to_h" for d_to_h in [0.5, 1.0, 2.0]
+            @test begin
+                scatterer = TMatrix.Scatterer(
+                    r = rev,
+                    shape = TMatrix.SHAPE_CYLINDER,
+                    radius_type = TMatrix.RADIUS_EQUAL_VOLUME,
+                    refractive_index = m,
+                    axis_ratio = d_to_h,
+                    λ = λ,
+                )
+
+                np = -2
+                valid = true
+                for mm in 0:nmax
+                    if mm == 0
+                        T0, _ = TMatrix.Wrapper.tmatr0(ngauss, nmax, np, d_to_h, λ, m, rev)
+                    else
+                        T0, _ = TMatrix.Wrapper.tmatr(mm, ngauss, nmax, np, d_to_h, λ, m, rev)
+                    end
+                    T, _ = TMatrix.tmatr(scatterer, mm, ngauss, nmax)
+                    if !(T ≈ T0)
+                        valid = false
+                        break
+                    end
+                end
+
+                valid
+            end
+        end
+
+        @testset "for Chebyshev particles with ε = $ε and ncheb = $ncheb" for (ε, ncheb) in [
+            (ε, ncheb) for ε in [0.0, 0.1, 0.5], ncheb in [2, 3, 4, 10]
+        ]
+            @test begin
+                scatterer = TMatrix.Scatterer(
+                    r = rev,
+                    shape = TMatrix.SHAPE_CHEBYSHEV,
+                    radius_type = TMatrix.RADIUS_EQUAL_VOLUME,
+                    refractive_index = m,
+                    axis_ratio = ε,
+                    n = ncheb,
+                    λ = λ,
+                )
+
+                np = ncheb
+                valid = true
+                for mm in 0:nmax
+                    if mm == 0
+                        T0, _ = TMatrix.Wrapper.tmatr0(ngauss, nmax, np, ε, λ, m, rev)
+                    else
+                        T0, _ = TMatrix.Wrapper.tmatr(mm, ngauss, nmax, np, ε, λ, m, rev)
+                    end
+                    T, _ = TMatrix.tmatr(scatterer, mm, ngauss, nmax)
+                    if !(T ≈ T0)
+                        valid = false
+                        break
+                    end
+                end
+
+                valid
+            end
+        end
+    end
+
+    @testset "Calculate amplitude" begin
+        λ = 1.0
+        m = 1.5 + 0.02im
+        rev = 1.0
+        ratio = 1.0
+        ddelta = 0.001
+        ϑ_i = 56.0
+        ϑ_s = 65.0
+        φ_i = 114.0
+        φ_s = 128.0
+        α = 145.0
+        β = 52.0
+
+        @testset "for spheroids with a_to_c = $a_to_c" for a_to_c in [0.5, 1.0, 2.0]
+            @test begin
+                scatterer = TMatrix.Scatterer(
+                    r = rev,
+                    shape = TMatrix.SHAPE_SPHEROID,
+                    radius_type = TMatrix.RADIUS_EQUAL_VOLUME,
+                    refractive_index = m,
+                    axis_ratio = a_to_c,
+                    λ = λ,
+                )
+
+                T = TMatrix.calc_tmatrix(scatterer, ddelta)
+                S, Z = TMatrix.calc_SZ(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, T)
+
+                np = -1
+                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, a_to_c, np, ddelta, 2)
+                S0, Z0 = TMatrix.Wrapper.calc_SZ(nmax, λ, α, β, ϑ_i, ϑ_s, φ_i, φ_s)
+
+                isapprox(T, T0, rtol = 1e-6) && isapprox(S, S0, rtol = 1e-6) && isapprox(Z, Z0, rtol = 1e-6)
+            end
+        end
+
+        @testset "for cylinders with d_to_h = $d_to_h" for d_to_h in [0.5, 1.0, 2.0]
+            @test begin
+                scatterer = TMatrix.Scatterer(
+                    r = rev,
+                    shape = TMatrix.SHAPE_CYLINDER,
+                    radius_type = TMatrix.RADIUS_EQUAL_VOLUME,
+                    refractive_index = m,
+                    axis_ratio = d_to_h,
+                    λ = λ,
+                )
+
+                T = TMatrix.calc_tmatrix(scatterer, ddelta)
+                S, Z = TMatrix.calc_SZ(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, T)
+
+                np = -2
+                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, d_to_h, np, ddelta, 2)
+                S0, Z0 = TMatrix.Wrapper.calc_SZ(nmax, λ, α, β, ϑ_i, ϑ_s, φ_i, φ_s)
+
+                isapprox(T, T0, rtol = 1e-6) && isapprox(S, S0, rtol = 1e-6) && isapprox(Z, Z0, rtol = 1e-6)
+            end
+        end
+
+        @testset "for Chebyshev particles with ε = $ε and ncheb = $ncheb" for (ε, ncheb) in [
+            (ε, ncheb) for ε in [-0.15, 0.01, 0.1], ncheb in [2, 3, 4]
+        ]
+            @test begin
+                scatterer = TMatrix.Scatterer(
+                    r = rev,
+                    shape = TMatrix.SHAPE_CHEBYSHEV,
+                    radius_type = TMatrix.RADIUS_EQUAL_VOLUME,
+                    refractive_index = m,
+                    axis_ratio = ε,
+                    n = ncheb,
+                    λ = λ,
+                )
+
+                T = TMatrix.calc_tmatrix(scatterer, ddelta)
+                S, Z = TMatrix.calc_SZ(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, T)
+
+                np = ncheb
+                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, ε, np, ddelta, 2)
+                S0, Z0 = TMatrix.Wrapper.calc_SZ(nmax, λ, α, β, ϑ_i, ϑ_s, φ_i, φ_s)
+
+                isapprox(T, T0, rtol = 1e-6) && isapprox(S, S0, rtol = 1e-6) && isapprox(Z, Z0, rtol = 1e-6)
             end
         end
     end

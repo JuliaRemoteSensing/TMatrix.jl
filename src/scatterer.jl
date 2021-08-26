@@ -86,8 +86,8 @@ function Scatterer(;
     ngauss::Int64 = CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS,
     λ::T = 1.0,
 ) where {T<:Real}
-    if shape == SHAPE_CHEBYSHEV && (axis_ratio < 0.0 || axis_ratio >= 1.0)
-        error("Constraint violated: Chebyshev particles should have 0≤ε<1.")
+    if shape == SHAPE_CHEBYSHEV && (abs(axis_ratio) < 0.0 || abs(axis_ratio) >= 1.0)
+        error("Constraint violated: Chebyshev particles should have 0≤|ε|<1.")
     end
 
     if radius_type == RADIUS_EQUAL_VOLUME
@@ -170,8 +170,91 @@ calc_tmatrix(scatterer::Scatterer, accuracy::Float64=0.001)
 ```
 
 Calculate the T-Matrix of the scatterer.
+
+Parameters:
+
+- `scatterer`: The scatterer.
+- `accuracy`: The intended threshold for convergence. Default is 0.001.
+
 """
-function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64 = 0.001) end
+function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64 = 0.0001)
+    kr = 2π * scatterer.rev / scatterer.λ
+    nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
+    ngstart = nstart * 4
+    nmax = nstart
+    ngauss = ngstart
+    Δ = 1.0
+
+    Qext0 = 0.0
+    Qsca0 = 0.0
+    while Δ > accuracy
+        Qext = 0.0
+        Qsca = 0.0
+
+        T0, _ = tmatr(scatterer, 0, ngauss, nmax)
+        for n in 1:nmax
+            Qsca += (2n + 1) * real(T0[n, n] * T0[n, n]' + T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]')
+            Qext += (2n + 1) * (real(T0[n, n] + real(T0[n + nmax, n + nmax])))
+        end
+
+        ΔQsca = abs((Qsca0 - Qsca) / Qsca)
+        ΔQext = abs((Qext0 - Qext) / Qext)
+        Δ = max(ΔQsca, ΔQext)
+
+        @debug "nmax iteration" nmax ΔQsca ΔQext
+
+        if Δ <= accuracy
+            break
+        end
+
+        Qsca0 = Qsca
+        Qext0 = Qext
+        nmax += 1
+        ngauss += 4
+    end
+
+    Δ = 1.0
+    Qext0 = 0.0
+    Qsca0 = 0.0
+    while Δ > accuracy
+        Qext = 0.0
+        Qsca = 0.0
+
+        T0, _ = tmatr(scatterer, 0, ngauss, nmax)
+        for n in 1:nmax
+            Qsca += (2n + 1) * real(T0[n, n] * T0[n, n]' + T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]')
+            Qext += (2n + 1) * (real(T0[n, n]) + real(T0[n + nmax, n + nmax]))
+        end
+
+        ΔQsca = abs((Qsca0 - Qsca) / Qsca)
+        ΔQext = abs((Qext0 - Qext) / Qext)
+        Δ = max(ΔQsca, ΔQext)
+
+        @debug "ngauss iteration" ngauss ΔQsca ΔQext
+
+        Qsca0 = Qsca
+        Qext0 = Qext
+
+        if Δ <= accuracy
+            break
+        end
+
+        ngauss += 2
+    end
+
+    @debug "Convergence reached" nmax ngauss
+
+    T0, _ = tmatr(scatterer, 0, ngauss, nmax)
+    T = [T0]
+    for mm in 1:nmax
+        Tmm, _ = tmatr(scatterer, mm, ngauss, nmax)
+        push!(T, Tmm)
+    end
+
+    @debug "Cross section" cross_section(T, scatterer.λ)
+
+    return T
+end
 
 @doc raw"""
 ```
@@ -200,7 +283,7 @@ function calc_amplitude(
     ϑ_s::T,
     φ_i::T,
     φ_s::T,
-    tmatrix::Union{Vector{Array{T,2}},Nothing},
+    tmatrix::Union{Vector{Array{Complex{T},2}},Nothing} = nothing,
 ) where {T<:Real}
     # Validate the input angles
     @assert 0.0 <= α <= 360.0 &&
@@ -225,6 +308,7 @@ function calc_amplitude(
 
     cosβ = cos(β)
     sinβ = sin(β)
+
     cosϑ_i = cos(ϑ_i)
     sinϑ_i = sin(ϑ_i)
     cosφ = cos(φ_i - α)
@@ -265,12 +349,12 @@ function calc_amplitude(
     cosφ_s = cos(φ_s)
     sinφ_s = sin(φ_s)
     AL[1, 1] = cosϑ_i * cosφ_i
-    AL[1, 2] = -sinϑ_i
+    AL[1, 2] = -sinφ_i
     AL[2, 1] = cosϑ_i * sinφ_i
     AL[2, 2] = cosφ_i
     AL[3, 1] = -sinϑ_i
     AL1[1, 1] = cosϑ_s * cosφ_s
-    AL1[1, 2] = -sinϑ_s
+    AL1[1, 2] = -sinφ_s
     AL1[2, 1] = cosϑ_s * sinφ_s
     AL1[2, 2] = cosφ_s
     AL1[3, 1] = -sinϑ_s
@@ -299,9 +383,8 @@ function calc_amplitude(
     D = 1.0 / (R1[1, 1] * R1[2, 2] - R1[1, 2] * R1[2, 1])
     R1 = D * [R1[2, 2] -R1[1, 2]; -R1[2, 1] R1[1, 1]]
 
-    # 可以考虑复用const中计算的结果
     CAL = [
-        Complext{T}((1.0im)^(i - j - 1) * √((2j + 1) * (2i + 1) / (i * j * (i + 1) * (j + 1)))) for i in 1:nmax,
+        Complex{T}((1.0im)^(j - i - 1) * √((2j + 1) * (2i + 1) / (i * j * (i + 1) * (j + 1)))) for i in 1:nmax,
         j in 1:nmax
     ]
 
@@ -311,28 +394,29 @@ function calc_amplitude(
     HV = Complex{T}(0.0im)
     HH = Complex{T}(0.0im)
     for m in 0:nmax
-        nmin = max(m, 1)
-        dv1, dv2 = vigampl(nmax, m, cosϑ_p)
-        dv01, dv02 = vigampl(nmax, m, cosϑ_q)
+        dv1, dv2 = vigampl(nmax, m, cosϑ_q)
+        dv01, dv02 = vigampl(nmax, m, cosϑ_p)
         fc = 2.0cos(m * φ)
         fs = 2.0sin(m * φ)
-        for nn in nmin:nmax
-            for n in nmin:nmax
+        nm = nmax - max(m, 1) + 1
+        dm = nmax - nm
+        for nn in 1:nm
+            for n in 1:nm
                 T11 = tmatrix[m + 1][n, nn]
-                T22 = tmatrix[m + 1][n + nmax, nn + nmax]
+                T22 = tmatrix[m + 1][n + nm, nn + nm]
                 if m == 0
-                    CN = CAL[n, nn] * dv2[n] * dv02[nn]
+                    CN = CAL[n + dm, nn + dm] * dv2[n + dm] * dv02[nn + dm]
                     VV += CN * T22
                     HH += CN * T11
                 else
-                    T12 = tmatrix[m + 1][n, nn + nmax]
-                    T21 = tmatrix[m + 1][n + nmax, nn]
-                    CN1 = CAL[n, nn] * fc
-                    CN2 = CAL[n, nn] * fs
-                    D11 = m^2 * dv1[n] * dv01[nn]
-                    D12 = m * dv1[n] * dv02[nn]
-                    D21 = m * dv2[n] * dv01[nn]
-                    D22 = dv2[n] * dv02[nn]
+                    T12 = tmatrix[m + 1][n, nn + nm]
+                    T21 = tmatrix[m + 1][n + nm, nn]
+                    CN1 = CAL[n + dm, nn + dm] * fc
+                    CN2 = CAL[n + dm, nn + dm] * fs
+                    D11 = m^2 * dv1[n + dm] * dv01[nn + dm]
+                    D12 = m * dv1[n + dm] * dv02[nn + dm]
+                    D21 = m * dv2[n + dm] * dv01[nn + dm]
+                    D22 = dv2[n + dm] * dv02[nn + dm]
                     VV += (T11 * D11 + T21 * D21 + T12 * D12 + T22 * D22) * CN1
                     VH += (T11 * D12 + T21 * D22 + T12 * D11 + T22 * D21) * CN2
                     HV -= (T11 * D21 + T21 * D11 + T12 * D22 + T22 * D12) * CN2
@@ -342,7 +426,7 @@ function calc_amplitude(
         end
     end
 
-    DK = 2π / λ
+    DK = 2π / scatterer.λ
     VV /= DK
     VH /= DK
     HV /= DK
@@ -368,7 +452,7 @@ Calculate the phase matrix using the given amplitude matrix $\mathbf{S}$.
 function calc_phase(S::Array{Complex{T},2}) where {T<:Real}
     @assert size(S) == (2, 2)
 
-    Z = zeros(T, 4, 4)
+    Z = zeros(Complex{T}, 4, 4)
     Z[1, 1] = 0.5 * (S[1, 1] * S[1, 1]' + S[1, 2] * S[1, 2]' + S[2, 1] * S[2, 1]' + S[2, 2] * S[2, 2]')
     Z[1, 2] = 0.5 * (S[1, 1] * S[1, 1]' - S[1, 2] * S[1, 2]' + S[2, 1] * S[2, 1]' - S[2, 2] * S[2, 2]')
     Z[1, 3] = -S[1, 1] * S[1, 2]' - S[2, 2] * S[2, 1]'
@@ -386,7 +470,7 @@ function calc_phase(S::Array{Complex{T},2}) where {T<:Real}
     Z[4, 3] = -1.0im * (S[2, 2] * S[1, 1]' - S[1, 2] * S[2, 1]')
     Z[4, 4] = S[2, 2] * S[1, 1]' - S[1, 2] * S[2, 1]'
 
-    return Z
+    return real.(Z)
 end
 
 calc_Z = calc_phase
@@ -399,7 +483,7 @@ function calc_SZ(
     ϑ_s::T,
     φ_i::T,
     φ_s::T,
-    tmatrix::Union{Vector{Array{T,2}},Nothing},
+    tmatrix::Union{Vector{Array{Complex{T},2}},Nothing} = nothing,
 ) where {T<:Real}
     S = calc_S(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, tmatrix)
     Z = calc_Z(S)
@@ -534,14 +618,15 @@ function vary(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
 
     r, dr = calc_r(scatterer, ngauss)
     λ = scatterer.λ
-    mr = real(scatterer.m)
-    mi = imag(scatterer.m)
-    mm = mr^2 + mi^2
-    kr = 2π / λ * r
+    k = 2π / λ
+    kr = k * r
+    kr1 = 1.0 ./ kr
     kr_s = scatterer.m * kr
+    kr_s1 = 1.0 ./ kr_s
     rmax = maximum(r)
-    tb = max(nmax, rmax * √mm)
-    nnmax1 = Int64(floor(1.2 * √(max(rmax, nmax)) + 3.0))
+    krmax = k * rmax
+    tb = max(nmax, krmax * norm(scatterer.m))
+    nnmax1 = Int64(floor(1.2 * √(max(krmax, nmax)) + 3.0))
     nnmax2 = Int64(floor(tb + 4.0 * ∛tb + 1.2 * √tb - nmax + 5))
 
     jkr = zeros(T, ngauss, nmax)
@@ -557,5 +642,151 @@ function vary(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
         jkr_s[i, :], djkr_s[i, :] = sphericalbesselj(kr_s[i], nmax, nnmax2)
     end
 
-    return r, dr, jkr, djkr, ykr, dykr, jkr_s, djkr_s
+    return r, dr, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s
+end
+
+function tmatr0(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64) end
+
+function tmatr(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int64)
+    T = typeof(scatterer.rev)
+    CT = Complex{T}
+    x, w, an, ann, s, ss = const_(scatterer, ngauss, nmax)
+    r, dr, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = vary(scatterer, ngauss, nmax)
+
+    hkr = jkr + 1.0im * ykr
+    dhkr = djkr + 1.0im * dykr
+    sig = [i % 2 == 1 ? -1.0 : 1.0 for i in 1:nmax]
+
+    d = zeros(T, ngauss, nmax)
+    p = zeros(T, ngauss, nmax)
+    τ = zeros(T, ngauss, nmax)
+    for i in (ngauss ÷ 2 + 1):ngauss
+        ineg = ngauss + 1 - i
+        d[i, :], τ[i, :] = vig(nmax, m, x[i])
+        p[i, :] = m * d[i, :] * s[i]
+        d[ineg, :] = d[i, :] .* sig
+        τ[ineg, :] = -τ[i, :] .* sig
+        p[ineg, :] = p[i, :] .* sig
+    end
+
+    J11 = zeros(CT, nmax, nmax)
+    J12 = zeros(CT, nmax, nmax)
+    J21 = zeros(CT, nmax, nmax)
+    J22 = zeros(CT, nmax, nmax)
+    RgJ11 = zeros(CT, nmax, nmax)
+    RgJ12 = zeros(CT, nmax, nmax)
+    RgJ21 = zeros(CT, nmax, nmax)
+    RgJ22 = zeros(CT, nmax, nmax)
+
+    wr2 = w .* r .* r
+
+    mm = max(m, 1)
+    for n2 in mm:nmax
+        for n1 in mm:nmax
+            # J11[n1, n2] = sum(wr2 .* hkr[:, n1] .* jkr_s[:, n2] .* (p[:, n1] .* τ[:, n2] + τ[:, n1] .* p[:, n2]))
+            # J12[n1, n2] = sum(wr2 .* jkr_s[:, n2] .* (dhkr[:, n1] .* (p[:, n1] .* p[:, n2] + τ[:, n1] .* τ[:, n2]) + dr ./ r * an[n1] .* hkr[:, n1] .* kr1 .* d[:, n1] .* τ[:, n2]))
+
+            for i in 1:ngauss
+                J11[n1, n2] += wr2[i] * hkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
+
+                J12[n1, n2] +=
+                    wr2[i] *
+                    jkr_s[i, n2] *
+                    (
+                        dhkr[i, n1] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
+                        dr[i] / r[i] * an[n1] * hkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
+                    )
+
+                J21[n1, n2] +=
+                    wr2[i] *
+                    hkr[i, n1] *
+                    (
+                        djkr_s[i, n2] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
+                        dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
+                    )
+                J22[n1, n2] +=
+                    wr2[i] * (
+                        dhkr[i, n1] * djkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2]) +
+                        dr[i] / r[i] *
+                        (
+                            an[n1] * hkr[i, n1] * kr1[i] * djkr_s[i, n2] +
+                            an[n2] * jkr_s[i, n2] * kr_s1[i] * dhkr[i, n1]
+                        ) *
+                        p[i, n1] *
+                        d[i, n2]
+                    )
+
+                RgJ11[n1, n2] += wr2[i] * jkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
+                RgJ12[n1, n2] +=
+                    wr2[i] *
+                    jkr_s[i, n2] *
+                    (
+                        djkr[i, n1] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
+                        dr[i] / r[i] * an[n1] * jkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
+                    )
+                RgJ21[n1, n2] +=
+                    wr2[i] *
+                    jkr[i, n1] *
+                    (
+                        djkr_s[i, n2] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
+                        dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
+                    )
+                RgJ22[n1, n2] +=
+                    wr2[i] * (
+                        djkr[i, n1] * djkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2]) +
+                        dr[i] / r[i] *
+                        (
+                            an[n1] * jkr[i, n1] * kr1[i] * djkr_s[i, n2] +
+                            an[n2] * jkr_s[i, n2] * kr_s1[i] * djkr[i, n1]
+                        ) *
+                        p[i, n1] *
+                        d[i, n2]
+                    )
+            end
+        end
+    end
+
+    J11 .*= -ann
+    J12 .*= -1.0im * ann
+    J21 .*= 1.0im * ann
+    J22 .*= -ann
+
+    RgJ11 .*= -ann
+    RgJ12 .*= -1.0im * ann
+    RgJ21 .*= 1.0im * ann
+    RgJ22 .*= -ann
+
+    k = 2π / scatterer.λ
+    k_s = k * scatterer.m
+    kk = k^2
+    kk_s = k * k_s
+
+    # Since T = -RgQ⋅Q', the coefficient -i of Q and RgQ can be cancelled out.
+
+    Q11 = kk_s * J21 + kk * J12
+    Q12 = kk_s * J11 + kk * J22
+    Q21 = kk_s * J22 + kk * J11
+    Q22 = kk_s * J12 + kk * J21
+
+    RgQ11 = kk_s * RgJ21 + kk * RgJ12
+    RgQ12 = kk_s * RgJ11 + kk * RgJ22
+    RgQ21 = kk_s * RgJ22 + kk * RgJ11
+    RgQ22 = kk_s * RgJ12 + kk * RgJ21
+
+    nm = nmax - mm + 1
+    Q = zeros(CT, 2nm, 2nm)
+    Q[1:nm, 1:nm] = Q11[mm:nmax, mm:nmax]
+    Q[1:nm, (nm + 1):(2nm)] = Q12[mm:nmax, mm:nmax]
+    Q[(nm + 1):(2nm), 1:nm] = Q21[mm:nmax, mm:nmax]
+    Q[(nm + 1):(2nm), (nm + 1):(2nm)] = Q22[mm:nmax, mm:nmax]
+
+    RgQ = zeros(CT, 2nm, 2nm)
+    RgQ[1:nm, 1:nm] = RgQ11[mm:nmax, mm:nmax]
+    RgQ[1:nm, (nm + 1):(2nm)] = RgQ12[mm:nmax, mm:nmax]
+    RgQ[(nm + 1):(2nm), 1:nm] = RgQ21[mm:nmax, mm:nmax]
+    RgQ[(nm + 1):(2nm), (nm + 1):(2nm)] = RgQ22[mm:nmax, mm:nmax]
+
+    T = -RgQ * inv(Q)
+
+    return T, Q, RgQ
 end

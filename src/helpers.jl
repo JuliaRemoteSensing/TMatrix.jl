@@ -107,3 +107,56 @@ function sphericalbessely(x::T, nmax::Int64) where {T<:Number}
 
     return y, v
 end
+
+function cross_section(T::Vector{Matrix{Complex{P}}}, λ::P) where {P<:Real}
+    nmax = length(T) - 1
+
+    Qsca = 0.0
+    Qext = 0.0
+    for n2 in 1:nmax
+        nn2 = n2 + nmax
+        for n1 in 1:nmax
+            nn1 = n1 + nmax
+            Qsca +=
+                T[1][n1, n2] * T[1][n1, n2]' +
+                T[1][n1, nn2] * T[1][n1, nn2]' +
+                T[1][nn1, n2] * T[1][nn1, n2]' +
+                T[1][nn1, nn2] * T[1][nn1, nn2]'
+        end
+    end
+    for n in 1:(2nmax)
+        Qext += real(T[1][n, n])
+    end
+
+    for mm in 1:nmax
+        nm = nmax - mm + 1
+        for n2 in 1:nm
+            nn2 = n2 + nm
+            for n1 in 1:nm
+                nn1 = n1 + nm
+                Qsca +=
+                    (
+                        T[mm + 1][n1, n2] * T[mm + 1][n1, n2]' +
+                        T[mm + 1][n1, nn2] * T[mm + 1][n1, nn2]' +
+                        T[mm + 1][nn1, n2] * T[mm + 1][nn1, n2]' +
+                        T[mm + 1][nn1, nn2] * T[mm + 1][nn1, nn2]'
+                    ) * 2.0
+            end
+        end
+
+        for n in 1:(2nm)
+            Qext += real(T[mm + 1][n, n]) * 2.0
+        end
+    end
+
+    coeff = 0.5 * λ^2 / π
+    Csca = abs(real(Qsca)) * coeff
+    Cext = abs(Qext) * coeff
+    ω = Csca / Cext
+
+    if ω > 1.0
+        @warn "ω is greater than 1.0"
+    end
+
+    return Csca, Cext, ω
+end
