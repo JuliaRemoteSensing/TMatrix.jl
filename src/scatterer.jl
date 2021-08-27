@@ -139,17 +139,14 @@ function Scatterer(;
             e = axis_ratio
             en = e * n
             x, w = gausslegendre(ngauss)
-            v = 0.0
-            @simd for i in 1:ngauss
-                θ = acos(x[i])
-                nθ = n * θ
-                sinθ = sin(θ)
-                sinnθ = sin(nθ)
-                cosnθ = cos(nθ)
-                a = 1.0 + e * cosnθ
-                ens = en * sinnθ
-                v += w[i] * (sinθ * a + x[i] * ens) * sinθ * a^2
-            end
+            θ = acos.(x)
+            nθ = n * θ
+            sinθ = sin.(θ)
+            sinnθ = sin.(nθ)
+            cosnθ = cos.(nθ)
+            a = e * cosnθ .+ 1.0
+            ens = en * sinnθ
+            v = sum(w .* (sinθ .* a + x .* ens) .* sinθ * a .^ 2)
             rv = ∛(0.75v)
             rev = r / (1.0 + e) * rv
         end
