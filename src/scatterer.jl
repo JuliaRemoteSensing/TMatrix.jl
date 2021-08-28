@@ -194,7 +194,7 @@ function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64 = 0.0001)
         Qext = 0.0
         Qsca = 0.0
 
-        T0, _ = tmatr(scatterer, 0, ngauss, nmax)
+        T0, _ = tmatr0(scatterer, ngauss, nmax)
         for n in 1:nmax
             Qsca += (2n + 1) * real(T0[n, n] * T0[n, n]' + T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]')
             Qext += (2n + 1) * (real(T0[n, n] + real(T0[n + nmax, n + nmax])))
@@ -223,7 +223,7 @@ function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64 = 0.0001)
         Qext = 0.0
         Qsca = 0.0
 
-        T0, _ = tmatr(scatterer, 0, ngauss, nmax)
+        T0, _ = tmatr0(scatterer, ngauss, nmax)
         for n in 1:nmax
             Qsca += (2n + 1) * real(T0[n, n] * T0[n, n]' + T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]')
             Qext += (2n + 1) * (real(T0[n, n]) + real(T0[n + nmax, n + nmax]))
@@ -247,7 +247,7 @@ function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64 = 0.0001)
 
     @debug "Convergence reached" nmax ngauss
 
-    T0, _ = tmatr(scatterer, 0, ngauss, nmax)
+    T0, _ = tmatr0(scatterer, ngauss, nmax)
     T = [T0]
     for mm in 1:nmax
         Tmm, _ = tmatr(scatterer, mm, ngauss, nmax)
@@ -648,7 +648,105 @@ function vary(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     return r, dr, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s
 end
 
-function tmatr0(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64) end
+function tmatr0(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
+    T = typeof(scatterer.rev)
+    CT = Complex{T}
+    sym = has_symmetric_plane(scatterer)
+    x, w, an, ann, _ = const_(scatterer, ngauss, nmax)
+    r, dr, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = vary(scatterer, ngauss, nmax)
+
+    hkr = jkr + 1.0im * ykr
+    dhkr = djkr + 1.0im * dykr
+    sig = [i % 2 == 1 ? -1.0 : 1.0 for i in 1:nmax]
+
+    d = zeros(T, ngauss, nmax)
+    τ = zeros(T, ngauss, nmax)
+    for i in (ngauss ÷ 2 + 1):ngauss
+        ineg = ngauss + 1 - i
+        d[i, :], τ[i, :] = vig(nmax, 0, x[i])
+        d[ineg, :] = d[i, :] .* sig
+        τ[ineg, :] = -τ[i, :] .* sig
+    end
+
+    J12 = zeros(CT, nmax, nmax)
+    J21 = zeros(CT, nmax, nmax)
+    RgJ12 = zeros(CT, nmax, nmax)
+    RgJ21 = zeros(CT, nmax, nmax)
+
+    wr2 = w .* r .* r
+
+    ngss = sym ? (ngauss ÷ 2) : ngauss
+    for n2 in 1:nmax
+        for n1 in 1:nmax
+            for i in 1:ngss
+                if !(sym && (n1 + n2) % 2 == 1)
+                    J12[n1, n2] +=
+                        wr2[i] *
+                        jkr_s[i, n2] *
+                        (
+                            dhkr[i, n1] * τ[i, n1] * τ[i, n2] +
+                            dr[i] / r[i] * an[n1] * hkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
+                        )
+
+                    J21[n1, n2] +=
+                        wr2[i] *
+                        hkr[i, n1] *
+                        (
+                            djkr_s[i, n2] * τ[i, n1] * τ[i, n2] +
+                            dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
+                        )
+
+                    RgJ12[n1, n2] +=
+                        wr2[i] *
+                        jkr_s[i, n2] *
+                        (
+                            djkr[i, n1] * τ[i, n1] * τ[i, n2] +
+                            dr[i] / r[i] * an[n1] * jkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
+                        )
+
+                    RgJ21[n1, n2] +=
+                        wr2[i] *
+                        jkr[i, n1] *
+                        (
+                            djkr_s[i, n2] * τ[i, n1] * τ[i, n2] +
+                            dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
+                        )
+                end
+            end
+        end
+    end
+
+    J12 .*= -1.0im * ann
+    J21 .*= 1.0im * ann
+
+    RgJ12 .*= -1.0im * ann
+    RgJ21 .*= 1.0im * ann
+
+    k = 2π / scatterer.λ
+    k_s = k * scatterer.m
+    kk = k^2
+    kk_s = k * k_s
+
+    # Since T = -RgQ⋅Q', the coefficient -i of Q and RgQ can be cancelled out.
+
+    Q11 = kk_s * J21 + kk * J12
+    Q22 = kk_s * J12 + kk * J21
+
+    RgQ11 = kk_s * RgJ21 + kk * RgJ12
+    RgQ22 = kk_s * RgJ12 + kk * RgJ21
+
+    Q = zeros(CT, 2nmax, 2nmax)
+    Q[1:nmax, 1:nmax] = Q11[1:nmax, 1:nmax]
+    Q[(nmax + 1):(2nmax), (nmax + 1):(2nmax)] = Q22[1:nmax, 1:nmax]
+
+    RgQ = zeros(CT, 2nmax, 2nmax)
+    RgQ[1:nmax, 1:nmax] = RgQ11[1:nmax, 1:nmax]
+    RgQ[(nmax + 1):(2nmax), (nmax + 1):(2nmax)] = RgQ22[1:nmax, 1:nmax]
+
+    T = -RgQ * inv(Q)
+
+    return T, Q, RgQ
+end
 
 function tmatr(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int64)
     T = typeof(scatterer.rev)

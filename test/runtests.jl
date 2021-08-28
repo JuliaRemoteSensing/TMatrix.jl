@@ -390,10 +390,11 @@ using Test
                 for mm in 0:nmax
                     if mm == 0
                         T0, _ = TMatrix.Wrapper.tmatr0(ngauss, nmax, np, a_to_c, λ, m, rev)
+                        T, _ = TMatrix.tmatr0(scatterer, ngauss, nmax)
                     else
                         T0, _ = TMatrix.Wrapper.tmatr(mm, ngauss, nmax, np, a_to_c, λ, m, rev)
+                        T, _ = TMatrix.tmatr(scatterer, mm, ngauss, nmax)
                     end
-                    T, _ = TMatrix.tmatr(scatterer, mm, ngauss, nmax)
                     if !(T ≈ T0)
                         valid = false
                         break
@@ -420,10 +421,11 @@ using Test
                 for mm in 0:nmax
                     if mm == 0
                         T0, _ = TMatrix.Wrapper.tmatr0(ngauss, nmax, np, d_to_h, λ, m, rev)
+                        T, _ = TMatrix.tmatr0(scatterer, ngauss, nmax)
                     else
                         T0, _ = TMatrix.Wrapper.tmatr(mm, ngauss, nmax, np, d_to_h, λ, m, rev)
+                        T, _ = TMatrix.tmatr(scatterer, mm, ngauss, nmax)
                     end
-                    T, _ = TMatrix.tmatr(scatterer, mm, ngauss, nmax)
                     if !(T ≈ T0)
                         valid = false
                         break
@@ -453,10 +455,11 @@ using Test
                 for mm in 0:nmax
                     if mm == 0
                         T0, _ = TMatrix.Wrapper.tmatr0(ngauss, nmax, np, ε, λ, m, rev)
+                        T, _ = TMatrix.tmatr0(scatterer, ngauss, nmax)
                     else
                         T0, _ = TMatrix.Wrapper.tmatr(mm, ngauss, nmax, np, ε, λ, m, rev)
+                        T, _ = TMatrix.tmatr(scatterer, mm, ngauss, nmax)
                     end
-                    T, _ = TMatrix.tmatr(scatterer, mm, ngauss, nmax)
                     if !(T ≈ T0)
                         valid = false
                         break
