@@ -161,6 +161,12 @@ function Scatterer(;
     end
 end
 
+function has_symmetric_plane(scatterer::AbstractScatterer)
+    return typeof(scatterer) <: Spheroid ||
+           typeof(scatterer) <: Cylinder ||
+           (typeof(scatterer) <: Chebyshev && scatterer.n % 2 == 0)
+end
+
 @doc raw"""
 ```
 calc_tmatrix(scatterer::Scatterer, accuracy::Float64=0.001)
@@ -647,6 +653,7 @@ function tmatr0(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64) end
 function tmatr(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int64)
     T = typeof(scatterer.rev)
     CT = Complex{T}
+    sym = has_symmetric_plane(scatterer)
     x, w, an, ann, s, ss = const_(scatterer, ngauss, nmax)
     r, dr, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = vary(scatterer, ngauss, nmax)
 
@@ -678,67 +685,76 @@ function tmatr(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int6
     wr2 = w .* r .* r
 
     mm = max(m, 1)
+    ngss = sym ? (ngauss ÷ 2) : ngauss
     for n2 in mm:nmax
         for n1 in mm:nmax
             # J11[n1, n2] = sum(wr2 .* hkr[:, n1] .* jkr_s[:, n2] .* (p[:, n1] .* τ[:, n2] + τ[:, n1] .* p[:, n2]))
             # J12[n1, n2] = sum(wr2 .* jkr_s[:, n2] .* (dhkr[:, n1] .* (p[:, n1] .* p[:, n2] + τ[:, n1] .* τ[:, n2]) + dr ./ r * an[n1] .* hkr[:, n1] .* kr1 .* d[:, n1] .* τ[:, n2]))
 
-            for i in 1:ngauss
-                J11[n1, n2] += wr2[i] * hkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
+            for i in 1:ngss
+                if !(sym && (n1 + n2) % 2 == 0)
+                    J11[n1, n2] += wr2[i] * hkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
 
-                J12[n1, n2] +=
-                    wr2[i] *
-                    jkr_s[i, n2] *
-                    (
-                        dhkr[i, n1] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
-                        dr[i] / r[i] * an[n1] * hkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
-                    )
+                    J22[n1, n2] +=
+                        wr2[i] * (
+                            dhkr[i, n1] * djkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2]) +
+                            dr[i] / r[i] *
+                            (
+                                an[n1] * hkr[i, n1] * kr1[i] * djkr_s[i, n2] +
+                                an[n2] * jkr_s[i, n2] * kr_s1[i] * dhkr[i, n1]
+                            ) *
+                            p[i, n1] *
+                            d[i, n2]
+                        )
 
-                J21[n1, n2] +=
-                    wr2[i] *
-                    hkr[i, n1] *
-                    (
-                        djkr_s[i, n2] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
-                        dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
-                    )
-                J22[n1, n2] +=
-                    wr2[i] * (
-                        dhkr[i, n1] * djkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2]) +
-                        dr[i] / r[i] *
+                    RgJ11[n1, n2] += wr2[i] * jkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
+
+                    RgJ22[n1, n2] +=
+                        wr2[i] * (
+                            djkr[i, n1] * djkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2]) +
+                            dr[i] / r[i] *
+                            (
+                                an[n1] * jkr[i, n1] * kr1[i] * djkr_s[i, n2] +
+                                an[n2] * jkr_s[i, n2] * kr_s1[i] * djkr[i, n1]
+                            ) *
+                            p[i, n1] *
+                            d[i, n2]
+                        )
+                end
+
+                if !(sym && (n1 + n2) % 2 == 1)
+                    J12[n1, n2] +=
+                        wr2[i] *
+                        jkr_s[i, n2] *
                         (
-                            an[n1] * hkr[i, n1] * kr1[i] * djkr_s[i, n2] +
-                            an[n2] * jkr_s[i, n2] * kr_s1[i] * dhkr[i, n1]
-                        ) *
-                        p[i, n1] *
-                        d[i, n2]
-                    )
+                            dhkr[i, n1] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
+                            dr[i] / r[i] * an[n1] * hkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
+                        )
 
-                RgJ11[n1, n2] += wr2[i] * jkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
-                RgJ12[n1, n2] +=
-                    wr2[i] *
-                    jkr_s[i, n2] *
-                    (
-                        djkr[i, n1] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
-                        dr[i] / r[i] * an[n1] * jkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
-                    )
-                RgJ21[n1, n2] +=
-                    wr2[i] *
-                    jkr[i, n1] *
-                    (
-                        djkr_s[i, n2] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
-                        dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
-                    )
-                RgJ22[n1, n2] +=
-                    wr2[i] * (
-                        djkr[i, n1] * djkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2]) +
-                        dr[i] / r[i] *
+                    J21[n1, n2] +=
+                        wr2[i] *
+                        hkr[i, n1] *
                         (
-                            an[n1] * jkr[i, n1] * kr1[i] * djkr_s[i, n2] +
-                            an[n2] * jkr_s[i, n2] * kr_s1[i] * djkr[i, n1]
-                        ) *
-                        p[i, n1] *
-                        d[i, n2]
-                    )
+                            djkr_s[i, n2] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
+                            dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
+                        )
+
+                    RgJ12[n1, n2] +=
+                        wr2[i] *
+                        jkr_s[i, n2] *
+                        (
+                            djkr[i, n1] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
+                            dr[i] / r[i] * an[n1] * jkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
+                        )
+
+                    RgJ21[n1, n2] +=
+                        wr2[i] *
+                        jkr[i, n1] *
+                        (
+                            djkr_s[i, n2] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
+                            dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
+                        )
+                end
             end
         end
     end
