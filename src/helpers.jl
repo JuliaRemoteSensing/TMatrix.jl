@@ -1,4 +1,4 @@
-function vig(nmax::Int64, m::Int64, x::T) where {T<:Real}
+function vig!(nmax::Int64, m::Int64, x::T, dv1::AbstractArray, dv2::AbstractArray) where {T<:Real}
     if x < -1 || x > 1 || abs(1.0 - abs(x)) < eps(x)
         error("Constraint violated: x ∈ (-1, 1)")
     end
@@ -14,8 +14,6 @@ function vig(nmax::Int64, m::Int64, x::T) where {T<:Real}
     a = 1.0
     qs = √(1.0 - x * x)
     qs1 = 1.0 / qs
-    dv1 = zeros(T, nmax)
-    dv2 = zeros(T, nmax)
     if m == 0
         d1 = 1.0
         d2 = x
@@ -42,7 +40,12 @@ function vig(nmax::Int64, m::Int64, x::T) where {T<:Real}
             d1, d2 = d2, d3
         end
     end
+end
 
+function vig(nmax::Int64, m::Int64, x::T) where {T<:Real}
+    dv1 = zeros(T, nmax)
+    dv2 = zeros(T, nmax)
+    vig!(nmax, m, x, dv1, dv2)
     return dv1, dv2
 end
 
@@ -69,7 +72,7 @@ function vigampl(nmax::Int64, m::Int64, x::T) where {T<:Real}
     return dv1, dv2
 end
 
-function sphericalbesselj(x::T, nmax::Int64, nnmax1::Int64) where {T<:Number}
+function sphericalbesselj!(x::T, nmax::Int64, nnmax1::Int64, y::AbstractArray, u::AbstractArray) where {T<:Number}
     l = nmax + nnmax1
     z = zeros(T, l)
     x1 = 1.0 / x
@@ -79,21 +82,22 @@ function sphericalbesselj(x::T, nmax::Int64, nnmax1::Int64) where {T<:Number}
     end
     z0 = 1.0 / (x1 - z[1])
     y0 = z0 * cos(x) * x1
-    y = zeros(T, nmax)
-    u = zeros(T, nmax)
     y[1] = y0 * z[1]
     u[1] = y0 - y[1] * x1
     for i in 2:nmax
         y[i] = y[i - 1] * z[i]
         u[i] = y[i - 1] - y[i] * x1 * i
     end
+end
 
+function sphericalbesselj(x::T, nmax::Int64, nnmax1::Int64) where {T<:Number}
+    y = zeros(T, nmax)
+    u = zeros(T, nmax)
+    sphericalbesselj!(x, nmax, nnmax1, y, u)
     return y, u
 end
 
-function sphericalbessely(x::T, nmax::Int64) where {T<:Number}
-    y = zeros(T, nmax)
-    v = zeros(T, nmax)
+function sphericalbessely!(x::T, nmax::Int64, y::AbstractArray, v::AbstractArray) where {T<:Real}
     x1 = 1.0 / x
     y[1] = -cos(x) * x1^2 - sin(x) * x1
     y[2] = (-3.0 * x1^3 + x1) * cos(x) - 3.0x1^2 * sin(x)
@@ -104,7 +108,12 @@ function sphericalbessely(x::T, nmax::Int64) where {T<:Number}
     for i in 2:nmax
         v[i] = y[i - 1] - i * x1 * y[i]
     end
+end
 
+function sphericalbessely(x::T, nmax::Int64) where {T<:Real}
+    y = zeros(T, nmax)
+    v = zeros(T, nmax)
+    sphericalbessely!(x, nmax, y, v)
     return y, v
 end
 

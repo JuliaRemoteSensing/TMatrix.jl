@@ -1,6 +1,97 @@
 @enum Shape SHAPE_SPHEROID SHAPE_CYLINDER SHAPE_CHEBYSHEV
 @enum RadiusType RADIUS_EQUAL_VOLUME RADIUS_EQUAL_AREA RADIUS_MAXIMUM
 
+const NPN1 = 100
+const NPNG1 = 500
+
+mutable struct ScattererInfo{T<:Real}
+    nmax::Int64
+    ngauss::Int64
+    ncap::Int64
+    ngcap::Int64
+    an::Array{T,1} # (nmax,)
+    ann::Array{T,2} # (nmax, nmax)
+    sig::Array{T,1} # (nmax,)
+    x::Array{T,1} # (ngauss,)
+    w::Array{T,1} # (ngauss,)
+    s::Array{T,1} # (ngauss,)
+    r::Array{T,1} # (ngauss,)
+    dr::Array{T,1} # (ngauss,)
+    kr1::Array{T,1} # (ngauss,)
+    kr_s1::Array{Complex{T},1} # (ngauss,)
+    jkr::Array{T,2} # (ngauss, nmax)
+    djkr::Array{T,2} # (ngauss, nmax)
+    ykr::Array{T,2} # (ngauss, nmax)
+    dykr::Array{T,2} # (ngauss, nmax)
+    hkr::Array{Complex{T},2} # (ngauss, nmax)
+    dhkr::Array{Complex{T},2} # (ngauss, nmax)
+    jkr_s::Array{Complex{T},2} # (ngauss, nmax)
+    djkr_s::Array{Complex{T},2} # (ngauss, nmax)
+    J11::Array{Complex{T},2}
+    J12::Array{Complex{T},2}
+    J21::Array{Complex{T},2}
+    J22::Array{Complex{T},2}
+    RgJ11::Array{Complex{T},2}
+    RgJ12::Array{Complex{T},2}
+    RgJ21::Array{Complex{T},2}
+    RgJ22::Array{Complex{T},2}
+    Q11::Array{Complex{T},2}
+    Q12::Array{Complex{T},2}
+    Q21::Array{Complex{T},2}
+    Q22::Array{Complex{T},2}
+    Q::Array{Complex{T},2}
+    RgQ11::Array{Complex{T},2}
+    RgQ12::Array{Complex{T},2}
+    RgQ21::Array{Complex{T},2}
+    RgQ22::Array{Complex{T},2}
+    RgQ::Array{Complex{T},2}
+end
+
+function ScattererInfo(T)
+    return ScattererInfo(
+        0,
+        0,
+        NPN1,
+        NPNG1,
+        [T(n * (n + 1)) for n in 1:NPN1],
+        [T(0.5 * √((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1)))) for n1 in 1:NPN1, n2 in 1:NPN1],
+        [i % 2 == 1 ? T(-1.0) : T(1.0) for i in 1:NPN1],
+        zeros(T, NPNG1),
+        zeros(T, NPNG1),
+        zeros(T, NPNG1),
+        zeros(T, NPNG1),
+        zeros(T, NPNG1),
+        zeros(T, NPNG1),
+        zeros(Complex{T}, NPNG1),
+        zeros(T, NPNG1, NPN1),
+        zeros(T, NPNG1, NPN1),
+        zeros(T, NPNG1, NPN1),
+        zeros(T, NPNG1, NPN1),
+        zeros(Complex{T}, NPNG1, NPN1),
+        zeros(Complex{T}, NPNG1, NPN1),
+        zeros(Complex{T}, NPNG1, NPN1),
+        zeros(Complex{T}, NPNG1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, 2NPN1, 2NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, NPN1, NPN1),
+        zeros(Complex{T}, 2NPN1, 2NPN1),
+    )
+end
+
 abstract type AbstractScatterer end
 
 const CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS = 60
@@ -14,12 +105,14 @@ Attributes:
 - `m`: The complex refractive index.
 - `a_to_c`: The ratio $a/c$ of the horizontal to rotational axes.
 - `λ`: The wavelength of the incident wave.
+- `info`: The accompanied information.
 """
 struct Spheroid{T<:Real} <: AbstractScatterer
     rev::T
     m::Complex{T}
     a_to_c::T
     λ::T
+    info::ScattererInfo{T}
 end
 
 @doc raw"""
@@ -37,6 +130,7 @@ struct Cylinder{T<:Real} <: AbstractScatterer
     m::Complex{T}
     d_to_h::T
     λ::T
+    info::ScattererInfo{T}
 end
 
 @doc raw"""
@@ -60,6 +154,7 @@ struct Chebyshev{T<:Real} <: AbstractScatterer
     ε::T
     n::Int64
     λ::T
+    info::ScattererInfo{T}
 end
 
 @doc raw"""
@@ -153,11 +248,11 @@ function Scatterer(;
     end
 
     if shape == SHAPE_SPHEROID
-        return Spheroid(rev, refractive_index, axis_ratio, λ)
+        return Spheroid(rev, refractive_index, axis_ratio, λ, ScattererInfo(T))
     elseif shape == SHAPE_CYLINDER
-        return Cylinder(rev, refractive_index, axis_ratio, λ)
+        return Cylinder(rev, refractive_index, axis_ratio, λ, ScattererInfo(T))
     elseif shape == SHAPE_CHEBYSHEV
-        return Chebyshev(rev, refractive_index, axis_ratio, n, λ)
+        return Chebyshev(rev, refractive_index, axis_ratio, n, λ, ScattererInfo(T))
     end
 end
 
@@ -194,7 +289,7 @@ function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64 = 0.0001)
         Qext = 0.0
         Qsca = 0.0
 
-        T0, _ = tmatr0(scatterer, ngauss, nmax)
+        T0, _ = tmatr0!(scatterer, ngauss, nmax)
         for n in 1:nmax
             Qsca += (2n + 1) * real(T0[n, n] * T0[n, n]' + T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]')
             Qext += (2n + 1) * (real(T0[n, n] + real(T0[n + nmax, n + nmax])))
@@ -223,7 +318,7 @@ function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64 = 0.0001)
         Qext = 0.0
         Qsca = 0.0
 
-        T0, _ = tmatr0(scatterer, ngauss, nmax)
+        T0, _ = tmatr0!(scatterer, ngauss, nmax)
         for n in 1:nmax
             Qsca += (2n + 1) * real(T0[n, n] * T0[n, n]' + T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]')
             Qext += (2n + 1) * (real(T0[n, n]) + real(T0[n + nmax, n + nmax]))
@@ -247,10 +342,10 @@ function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64 = 0.0001)
 
     @debug "Convergence reached" nmax ngauss
 
-    T0, _ = tmatr0(scatterer, ngauss, nmax)
+    T0, _ = tmatr0!(scatterer, ngauss, nmax)
     T = [T0]
     for mm in 1:nmax
-        Tmm, _ = tmatr(scatterer, mm, ngauss, nmax)
+        Tmm, _ = tmatr!(scatterer, mm, ngauss, nmax)
         push!(T, Tmm)
     end
 
@@ -496,15 +591,13 @@ end
 
 @doc raw"""
 ```
-calc_r(scatterer::Scatterer, ngauss::Int64)
+calc_r!(scatterer::Scatterer, ngauss::Int64, r::AbstractArray{Float64}, dr::AbstractArray{Float64})
 ```
 
 Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` points for a given scatterer.
 """
-function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
+function calc_r!(scatterer::AbstractScatterer, ngauss::Int64, r::AbstractArray{Float64}, dr::AbstractArray{Float64})
     rev = scatterer.rev
-    r = zeros(ngauss)
-    dr = zeros(ngauss)
 
     if typeof(scatterer) <: Cylinder
         if ngauss % 2 != 0
@@ -548,7 +641,6 @@ function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
 
         x, _ = gausslegendre(ngauss)
 
-        # TODO: Need to investigate this equation
         e = scatterer.a_to_c
         a = rev * ∛e
 
@@ -568,7 +660,6 @@ function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
 
         x, _ = gausslegendre(ngauss)
 
-        # TODO: Need to investigate this equation
         a = 1.5e^2 * (4.0dn^2 - 2.0) / (4.0dn^2 - 1.0) + 1.0
 
         if n % 2 == 0
@@ -583,11 +674,147 @@ function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
             dr[i] = -r0 * e * n * sin(xi)
         end
     end
+end
 
+@doc raw"""
+```
+calc_r(scatterer::Scatterer, ngauss::Int64)
+```
+
+Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` points for a given scatterer.
+"""
+function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
+    rev = scatterer.rev
+    r = zeros(ngauss)
+    dr = zeros(ngauss)
+    calc_r!(scatterer, ngauss, r, dr)
     return r, dr
 end
 
-function const_(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
+function update!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
+    info = scatterer.info
+
+    # No need to recalculate if both `ngauss` and `nmax` remains the same.
+    if ngauss == info.ngauss && nmax == info.nmax
+        return
+    end
+
+    T = typeof(scatterer.rev)
+
+    # Need to enlarge the arrays if either `ngauss` or `nmax` exceeds the current capacity.
+    if ngauss > info.ngcap || nmax > info.ncap
+        ncap = info.ncap
+        ngcap = info.ngcap
+        info.ncap = max(ncap, nmax * 2)
+        info.ngcap = max(ngcap, ngauss * 2)
+
+        if info.ncap > ncap
+            info.an = [T(n * (n + 1)) for n in 1:(info.ncap)]
+            info.ann = [
+                T(0.5 * √((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1)))) for n1 in 1:(info.ncap),
+                n2 in 1:(info.ncap)
+            ]
+            info.sig = [i % 2 == 1 ? T(-1.0) : T(1.0) for i in 1:(info.ncap)]
+        end
+
+        if info.ngcap > ngcap
+            info.x = zeros(T, info.ngcap)
+            info.w = zeros(T, info.ngcap)
+            info.s = zeros(T, info.ngcap)
+            info.r = zeros(T, info.ngcap)
+            info.dr = zeros(T, info.ngcap)
+            info.kr1 = zeros(T, info.ngcap)
+            info.kr_s1 = zeros(Complex{T}, info.ngcap)
+        end
+
+        if info.ncap > ncap
+            info.J11 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.J12 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.J21 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.J22 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.RgJ11 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.RgJ12 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.RgJ21 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.RgJ22 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.Q11 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.Q12 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.Q21 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.Q22 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.Q = zeros(Complex{T}, 2info.ncap, 2info.ncap)
+            info.RgQ11 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.RgQ12 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.RgQ21 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.RgQ22 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.RgQ = zeros(Complex{T}, 2info.ncap, 2info.ncap)
+        end
+
+        if info.ncap > ncap || info.ngcap > ngcap
+            info.jkr = zeros(T, info.ngcap, info.ncap)
+            info.djkr = zeros(T, info.ngcap, info.ncap)
+            info.ykr = zeros(T, info.ngcap, info.ncap)
+            info.dykr = zeros(T, info.ngcap, info.ncap)
+            info.hkr = zeros(Complex{T}, info.ngcap, info.ncap)
+            info.dhkr = zeros(Complex{T}, info.ngcap, info.ncap)
+            info.jkr_s = zeros(Complex{T}, info.ngcap, info.ncap)
+            info.djkr_s = zeros(Complex{T}, info.ngcap, info.ncap)
+        end
+    end
+
+    # Need to recalculate `x`, `w`, `s`, `r`, `dr`, `kr1` and `kr_s1` only if `ngauss` changes.
+    k = 2π / scatterer.λ
+
+    if ngauss != info.ngauss
+        if typeof(scatterer) <: Cylinder
+            ng = ngauss ÷ 2
+            ng1 = ng ÷ 2
+            ng2 = ng - ng1
+            x1, w1 = gausslegendre(ng1)
+            x2, w2 = gausslegendre(ng2)
+            xx = -cos(atan(scatterer.d_to_h))
+            info.x[1:ng1] = 0.5(xx + 1.0) * x1 .+ 0.5(xx - 1.0)
+            info.w[1:ng1] = 0.5(xx + 1.0) * w1
+            info.x[(ng1 + 1):ng] = -0.5xx * x2 .+ 0.5xx
+            info.w[(ng1 + 1):ng] = -0.5xx * w2
+            info.x[(ng + 1):ngauss] = -info.x[ng:-1:1]
+            info.w[(ng + 1):ngauss] = info.w[ng:-1:1]
+        else
+            x, w = gausslegendre(ngauss)
+            info.x[1:ngauss] = x
+            info.w[1:ngauss] = w
+        end
+
+        info.s[1:ngauss] = 1 ./ (sin ∘ acos).(info.x[1:ngauss])
+
+        calc_r!(scatterer, ngauss, info.r, info.dr)
+        info.kr1[1:ngauss] = 1.0 ./ (k * info.r[1:ngauss])
+        info.kr_s1[1:ngauss] = 1.0 ./ (scatterer.m * k * info.r[1:ngauss])
+    end
+
+    # The rest need to be recalculated when either `ngauss` or `nmax` changes.
+    rmax = maximum(info.r[1:ngauss])
+    kr = k * info.r[1:ngauss]
+    kr_s = scatterer.m * kr
+    krmax = k * rmax
+    tb = max(nmax, krmax * norm(scatterer.m))
+    nnmax1 = Int64(floor(1.2 * √(max(krmax, nmax)) + 3.0))
+    nnmax2 = Int64(floor(tb + 4.0 * ∛tb + 1.2 * √tb - nmax + 5))
+
+    for i in 1:ngauss
+        sphericalbesselj!(kr[i], nmax, nnmax1, view(info.jkr, i, :), view(info.djkr, i, :))
+        sphericalbessely!(kr[i], nmax, view(info.ykr, i, :), view(info.dykr, i, :))
+        sphericalbesselj!(kr_s[i], nmax, nnmax2, view(info.jkr_s, i, :), view(info.djkr_s, i, :))
+    end
+
+    info.hkr[1:ngauss, 1:nmax] = complex.(view(info.jkr, 1:ngauss, 1:nmax), view(info.ykr, 1:ngauss, 1:nmax))
+    info.dhkr[1:ngauss, 1:nmax] = complex.(view(info.djkr, 1:ngauss, 1:nmax), view(info.dykr, 1:ngauss, 1:nmax))
+
+    info.ngauss = ngauss
+    info.nmax = nmax
+
+    return
+end
+
+function constant(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     an = [Float64(n * (n + 1)) for n in 1:nmax]
     ann = [0.5 * √((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1))) for n1 in 1:nmax, n2 in 1:nmax]
 
@@ -648,34 +875,50 @@ function vary(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     return r, dr, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s
 end
 
-function tmatr0(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
+function tmatr0!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     T = typeof(scatterer.rev)
-    CT = Complex{T}
     sym = has_symmetric_plane(scatterer)
-    x, w, an, ann, _ = const_(scatterer, ngauss, nmax)
-    r, dr, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = vary(scatterer, ngauss, nmax)
+    update!(scatterer, ngauss, nmax)
 
-    hkr = jkr + 1.0im * ykr
-    dhkr = djkr + 1.0im * dykr
-    sig = [i % 2 == 1 ? -1.0 : 1.0 for i in 1:nmax]
+    info = scatterer.info
+    an = view(info.an, 1:nmax)
+    ann = view(info.ann, 1:nmax, 1:nmax)
+    sig = view(info.sig, 1:nmax)
+    x = view(info.x, 1:ngauss)
 
     d = zeros(T, ngauss, nmax)
     τ = zeros(T, ngauss, nmax)
     for i in (ngauss ÷ 2 + 1):ngauss
         ineg = ngauss + 1 - i
-        d[i, :], τ[i, :] = vig(nmax, 0, x[i])
-        d[ineg, :] = d[i, :] .* sig
-        τ[ineg, :] = -τ[i, :] .* sig
+        vig!(nmax, 0, x[i], view(d, i, :), view(τ, i, :))
+        d[ineg, :] = view(d, i, :) .* sig
+        τ[ineg, :] = -view(τ, i, :) .* sig
     end
 
-    J12 = zeros(CT, nmax, nmax)
-    J21 = zeros(CT, nmax, nmax)
-    RgJ12 = zeros(CT, nmax, nmax)
-    RgJ21 = zeros(CT, nmax, nmax)
-
+    ngss = sym ? (ngauss ÷ 2) : ngauss
+    w = view(info.w, 1:ngss)
+    r = view(info.r, 1:ngss)
+    dr = view(info.dr, 1:ngss)
+    kr1 = view(info.kr1, 1:ngss)
+    kr_s1 = view(info.kr_s1, 1:ngss)
     wr2 = w .* r .* r
 
-    ngss = sym ? (ngauss ÷ 2) : ngauss
+    jkr = view(info.jkr, 1:ngss, 1:nmax)
+    djkr = view(info.djkr, 1:ngss, 1:nmax)
+    hkr = view(info.hkr, 1:ngss, 1:nmax)
+    dhkr = view(info.dhkr, 1:ngss, 1:nmax)
+    jkr_s = view(info.jkr_s, 1:ngss, 1:nmax)
+    djkr_s = view(info.djkr_s, 1:ngss, 1:nmax)
+
+    J12 = view(info.J12, 1:nmax, 1:nmax)
+    J21 = view(info.J21, 1:nmax, 1:nmax)
+    RgJ12 = view(info.RgJ12, 1:nmax, 1:nmax)
+    RgJ21 = view(info.RgJ21, 1:nmax, 1:nmax)
+    fill!(J12, 0.0)
+    fill!(J21, 0.0)
+    fill!(RgJ12, 0.0)
+    fill!(RgJ21, 0.0)
+
     for n2 in 1:nmax
         for n1 in 1:nmax
             for i in 1:ngss
@@ -729,66 +972,95 @@ function tmatr0(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
 
     # Since T = -RgQ⋅Q', the coefficient -i of Q and RgQ can be cancelled out.
 
-    Q11 = kk_s * J21 + kk * J12
-    Q22 = kk_s * J12 + kk * J21
+    Q11 = view(info.Q11, 1:nmax, 1:nmax)
+    Q22 = view(info.Q22, 1:nmax, 1:nmax)
+    Q = view(info.Q, 1:(2nmax), 1:(2nmax))
+    RgQ11 = view(info.RgQ11, 1:nmax, 1:nmax)
+    RgQ22 = view(info.RgQ22, 1:nmax, 1:nmax)
+    RgQ = view(info.RgQ, 1:(2nmax), 1:(2nmax))
+    fill!(Q11, zero(eltype(Q11)))
+    fill!(Q22, zero(eltype(Q22)))
+    fill!(Q, zero(eltype(Q)))
+    fill!(RgQ11, zero(eltype(RgQ11)))
+    fill!(RgQ22, zero(eltype(RgQ22)))
+    fill!(RgQ, zero(eltype(RgQ)))
 
-    RgQ11 = kk_s * RgJ21 + kk * RgJ12
-    RgQ22 = kk_s * RgJ12 + kk * RgJ21
+    Q11 .= kk_s * J21 + kk * J12
+    Q22 .= kk_s * J12 + kk * J21
 
-    Q = zeros(CT, 2nmax, 2nmax)
-    Q[1:nmax, 1:nmax] = Q11[1:nmax, 1:nmax]
-    Q[(nmax + 1):(2nmax), (nmax + 1):(2nmax)] = Q22[1:nmax, 1:nmax]
+    RgQ11 .= kk_s * RgJ21 + kk * RgJ12
+    RgQ22 .= kk_s * RgJ12 + kk * RgJ21
 
-    RgQ = zeros(CT, 2nmax, 2nmax)
-    RgQ[1:nmax, 1:nmax] = RgQ11[1:nmax, 1:nmax]
-    RgQ[(nmax + 1):(2nmax), (nmax + 1):(2nmax)] = RgQ22[1:nmax, 1:nmax]
+    Q[1:nmax, 1:nmax] .= Q11[1:nmax, 1:nmax]
+    Q[(nmax + 1):(2nmax), (nmax + 1):(2nmax)] .= Q22[1:nmax, 1:nmax]
+
+    RgQ[1:nmax, 1:nmax] .= RgQ11[1:nmax, 1:nmax]
+    RgQ[(nmax + 1):(2nmax), (nmax + 1):(2nmax)] .= RgQ22[1:nmax, 1:nmax]
 
     T = -RgQ * inv(Q)
 
     return T, Q, RgQ
 end
 
-function tmatr(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int64)
+function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int64)
     T = typeof(scatterer.rev)
-    CT = Complex{T}
     sym = has_symmetric_plane(scatterer)
-    x, w, an, ann, s, ss = const_(scatterer, ngauss, nmax)
-    r, dr, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = vary(scatterer, ngauss, nmax)
+    update!(scatterer, ngauss, nmax)
 
-    hkr = jkr + 1.0im * ykr
-    dhkr = djkr + 1.0im * dykr
-    sig = [i % 2 == 1 ? -1.0 : 1.0 for i in 1:nmax]
+    info = scatterer.info
+    an = view(info.an, 1:nmax)
+    ann = view(info.ann, 1:nmax, 1:nmax)
+    sig = view(info.sig, 1:nmax)
+    x = view(info.x, 1:ngauss)
+    s = view(info.s, 1:ngauss)
 
     d = zeros(T, ngauss, nmax)
     p = zeros(T, ngauss, nmax)
     τ = zeros(T, ngauss, nmax)
     for i in (ngauss ÷ 2 + 1):ngauss
         ineg = ngauss + 1 - i
-        d[i, :], τ[i, :] = vig(nmax, m, x[i])
+        vig!(nmax, m, x[i], view(d, i, :), view(τ, i, :))
         p[i, :] = m * d[i, :] * s[i]
         d[ineg, :] = d[i, :] .* sig
         τ[ineg, :] = -τ[i, :] .* sig
         p[ineg, :] = p[i, :] .* sig
     end
 
-    J11 = zeros(CT, nmax, nmax)
-    J12 = zeros(CT, nmax, nmax)
-    J21 = zeros(CT, nmax, nmax)
-    J22 = zeros(CT, nmax, nmax)
-    RgJ11 = zeros(CT, nmax, nmax)
-    RgJ12 = zeros(CT, nmax, nmax)
-    RgJ21 = zeros(CT, nmax, nmax)
-    RgJ22 = zeros(CT, nmax, nmax)
-
-    wr2 = w .* r .* r
-
     mm = max(m, 1)
     ngss = sym ? (ngauss ÷ 2) : ngauss
+    w = view(info.w, 1:ngss)
+    r = view(info.r, 1:ngss)
+    dr = view(info.dr, 1:ngss)
+    kr1 = view(info.kr1, 1:ngss)
+    kr_s1 = view(info.kr_s1, 1:ngss)
+    wr2 = w .* r .* r
+
+    jkr = view(info.jkr, 1:ngss, 1:nmax)
+    djkr = view(info.djkr, 1:ngss, 1:nmax)
+    hkr = view(info.hkr, 1:ngss, 1:nmax)
+    dhkr = view(info.dhkr, 1:ngss, 1:nmax)
+    jkr_s = view(info.jkr_s, 1:ngss, 1:nmax)
+    djkr_s = view(info.djkr_s, 1:ngss, 1:nmax)
+
+    J11 = view(info.J11, 1:nmax, 1:nmax)
+    J12 = view(info.J12, 1:nmax, 1:nmax)
+    J21 = view(info.J21, 1:nmax, 1:nmax)
+    J22 = view(info.J22, 1:nmax, 1:nmax)
+    RgJ11 = view(info.RgJ11, 1:nmax, 1:nmax)
+    RgJ12 = view(info.RgJ12, 1:nmax, 1:nmax)
+    RgJ21 = view(info.RgJ21, 1:nmax, 1:nmax)
+    RgJ22 = view(info.RgJ22, 1:nmax, 1:nmax)
+    fill!(J11, zero(eltype(J11)))
+    fill!(J12, zero(eltype(J12)))
+    fill!(J21, zero(eltype(J21)))
+    fill!(J22, zero(eltype(J22)))
+    fill!(RgJ11, zero(eltype(RgJ11)))
+    fill!(RgJ12, zero(eltype(RgJ12)))
+    fill!(RgJ21, zero(eltype(RgJ21)))
+    fill!(RgJ22, zero(eltype(RgJ22)))
+
     for n2 in mm:nmax
         for n1 in mm:nmax
-            # J11[n1, n2] = sum(wr2 .* hkr[:, n1] .* jkr_s[:, n2] .* (p[:, n1] .* τ[:, n2] + τ[:, n1] .* p[:, n2]))
-            # J12[n1, n2] = sum(wr2 .* jkr_s[:, n2] .* (dhkr[:, n1] .* (p[:, n1] .* p[:, n2] + τ[:, n1] .* τ[:, n2]) + dr ./ r * an[n1] .* hkr[:, n1] .* kr1 .* d[:, n1] .* τ[:, n2]))
-
             for i in 1:ngss
                 if !(sym && (n1 + n2) % 2 == 0)
                     J11[n1, n2] += wr2[i] * hkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
@@ -872,30 +1144,49 @@ function tmatr(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int6
     kk = k^2
     kk_s = k * k_s
 
+    nm = nmax - mm + 1
+    Q11 = view(info.Q11, 1:nmax, 1:nmax)
+    Q12 = view(info.Q12, 1:nmax, 1:nmax)
+    Q21 = view(info.Q21, 1:nmax, 1:nmax)
+    Q22 = view(info.Q22, 1:nmax, 1:nmax)
+    Q = view(info.Q, 1:(2nm), 1:(2nm))
+    RgQ11 = view(info.RgQ11, 1:nmax, 1:nmax)
+    RgQ12 = view(info.RgQ12, 1:nmax, 1:nmax)
+    RgQ21 = view(info.RgQ21, 1:nmax, 1:nmax)
+    RgQ22 = view(info.RgQ22, 1:nmax, 1:nmax)
+    RgQ = view(info.RgQ, 1:(2nm), 1:(2nm))
+    fill!(Q11, zero(eltype(Q11)))
+    fill!(Q12, zero(eltype(Q12)))
+    fill!(Q21, zero(eltype(Q21)))
+    fill!(Q22, zero(eltype(Q22)))
+    fill!(Q, zero(eltype(Q)))
+    fill!(RgQ11, zero(eltype(RgQ11)))
+    fill!(RgQ12, zero(eltype(RgQ12)))
+    fill!(RgQ21, zero(eltype(RgQ21)))
+    fill!(RgQ22, zero(eltype(RgQ22)))
+    fill!(RgQ, zero(eltype(RgQ)))
+
     # Since T = -RgQ⋅Q', the coefficient -i of Q and RgQ can be cancelled out.
 
-    Q11 = kk_s * J21 + kk * J12
-    Q12 = kk_s * J11 + kk * J22
-    Q21 = kk_s * J22 + kk * J11
-    Q22 = kk_s * J12 + kk * J21
+    Q11 .= kk_s * J21 + kk * J12
+    Q12 .= kk_s * J11 + kk * J22
+    Q21 .= kk_s * J22 + kk * J11
+    Q22 .= kk_s * J12 + kk * J21
 
-    RgQ11 = kk_s * RgJ21 + kk * RgJ12
-    RgQ12 = kk_s * RgJ11 + kk * RgJ22
-    RgQ21 = kk_s * RgJ22 + kk * RgJ11
-    RgQ22 = kk_s * RgJ12 + kk * RgJ21
+    RgQ11 .= kk_s * RgJ21 + kk * RgJ12
+    RgQ12 .= kk_s * RgJ11 + kk * RgJ22
+    RgQ21 .= kk_s * RgJ22 + kk * RgJ11
+    RgQ22 .= kk_s * RgJ12 + kk * RgJ21
 
-    nm = nmax - mm + 1
-    Q = zeros(CT, 2nm, 2nm)
-    Q[1:nm, 1:nm] = Q11[mm:nmax, mm:nmax]
-    Q[1:nm, (nm + 1):(2nm)] = Q12[mm:nmax, mm:nmax]
-    Q[(nm + 1):(2nm), 1:nm] = Q21[mm:nmax, mm:nmax]
-    Q[(nm + 1):(2nm), (nm + 1):(2nm)] = Q22[mm:nmax, mm:nmax]
+    Q[1:nm, 1:nm] .= Q11[mm:nmax, mm:nmax]
+    Q[1:nm, (nm + 1):(2nm)] .= Q12[mm:nmax, mm:nmax]
+    Q[(nm + 1):(2nm), 1:nm] .= Q21[mm:nmax, mm:nmax]
+    Q[(nm + 1):(2nm), (nm + 1):(2nm)] .= Q22[mm:nmax, mm:nmax]
 
-    RgQ = zeros(CT, 2nm, 2nm)
-    RgQ[1:nm, 1:nm] = RgQ11[mm:nmax, mm:nmax]
-    RgQ[1:nm, (nm + 1):(2nm)] = RgQ12[mm:nmax, mm:nmax]
-    RgQ[(nm + 1):(2nm), 1:nm] = RgQ21[mm:nmax, mm:nmax]
-    RgQ[(nm + 1):(2nm), (nm + 1):(2nm)] = RgQ22[mm:nmax, mm:nmax]
+    RgQ[1:nm, 1:nm] .= RgQ11[mm:nmax, mm:nmax]
+    RgQ[1:nm, (nm + 1):(2nm)] .= RgQ12[mm:nmax, mm:nmax]
+    RgQ[(nm + 1):(2nm), 1:nm] .= RgQ21[mm:nmax, mm:nmax]
+    RgQ[(nm + 1):(2nm), (nm + 1):(2nm)] .= RgQ22[mm:nmax, mm:nmax]
 
     T = -RgQ * inv(Q)
 

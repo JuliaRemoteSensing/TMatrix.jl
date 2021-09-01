@@ -168,14 +168,14 @@ using Test
                 )
 
                 ngauss = nmax * 4
-                x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.const_(ngauss, nmax, -1, a_to_c)
+                x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.constant(ngauss, nmax, -1, a_to_c)
                 x0 = x0[1:ngauss]
                 w0 = w0[1:ngauss]
                 an0 = an0[1:nmax]
                 ann0 = ann0[1:nmax, 1:nmax]
                 s0 = s0[1:ngauss]
                 ss0 = ss0[1:ngauss]
-                x, w, an, ann, s, ss = TMatrix.const_(scatterer, ngauss, nmax)
+                x, w, an, ann, s, ss = TMatrix.constant(scatterer, ngauss, nmax)
                 x ≈ x0 && w ≈ w0 && an ≈ an0 && ann ≈ ann0 && s ≈ s0 && ss ≈ ss0
             end
         end
@@ -193,14 +193,14 @@ using Test
                 )
 
                 ngauss = nmax * 4
-                x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.const_(ngauss, nmax, -2, d_to_h)
+                x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.constant(ngauss, nmax, -2, d_to_h)
                 x0 = x0[1:ngauss]
                 w0 = w0[1:ngauss]
                 an0 = an0[1:nmax]
                 ann0 = ann0[1:nmax, 1:nmax]
                 s0 = s0[1:ngauss]
                 ss0 = ss0[1:ngauss]
-                x, w, an, ann, s, ss = TMatrix.const_(scatterer, ngauss, nmax)
+                x, w, an, ann, s, ss = TMatrix.constant(scatterer, ngauss, nmax)
                 x ≈ x0 && w ≈ w0 && an ≈ an0 && ann ≈ ann0 && s ≈ s0 && ss ≈ ss0
             end
         end
@@ -219,14 +219,14 @@ using Test
                 )
 
                 ngauss = nmax * 4
-                x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.const_(ngauss, nmax, ncheb, ε)
+                x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.constant(ngauss, nmax, ncheb, ε)
                 x0 = x0[1:ngauss]
                 w0 = w0[1:ngauss]
                 an0 = an0[1:nmax]
                 ann0 = ann0[1:nmax, 1:nmax]
                 s0 = s0[1:ngauss]
                 ss0 = ss0[1:ngauss]
-                x, w, an, ann, s, ss = TMatrix.const_(scatterer, ngauss, nmax)
+                x, w, an, ann, s, ss = TMatrix.constant(scatterer, ngauss, nmax)
                 x ≈ x0 && w ≈ w0 && an ≈ an0 && ann ≈ ann0 && s ≈ s0 && ss ≈ ss0
             end
         end
@@ -291,7 +291,7 @@ using Test
                 )
 
                 np = -1
-                x, _ = TMatrix.Wrapper.const_(ngauss, nmax, np, a_to_c)
+                x, _ = TMatrix.Wrapper.constant(ngauss, nmax, np, a_to_c)
                 _, _, _, _, _, ddr, drr, dri, jkr0, djkr0, ykr0, dykr0, jkr_s0, djkr_s0 =
                     TMatrix.Wrapper.vary(x, λ, m, rev, a_to_c, np, ngauss, nmax)
                 _, _, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
@@ -319,7 +319,7 @@ using Test
                 )
 
                 np = -2
-                x, _ = TMatrix.Wrapper.const_(ngauss, nmax, np, d_to_h)
+                x, _ = TMatrix.Wrapper.constant(ngauss, nmax, np, d_to_h)
                 _, _, _, _, _, ddr, drr, dri, jkr0, djkr0, ykr0, dykr0, jkr_s0, djkr_s0 =
                     TMatrix.Wrapper.vary(x, λ, m, rev, d_to_h, np, ngauss, nmax)
                 _, _, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
@@ -350,7 +350,7 @@ using Test
                 )
 
                 np = ncheb
-                x, _ = TMatrix.Wrapper.const_(ngauss, nmax, np, ε)
+                x, _ = TMatrix.Wrapper.constant(ngauss, nmax, np, ε)
                 _, _, _, _, _, ddr, drr, dri, jkr0, djkr0, ykr0, dykr0, jkr_s0, djkr_s0 =
                     TMatrix.Wrapper.vary(x, λ, m, rev, ε, np, ngauss, nmax)
                 _, _, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
@@ -390,10 +390,10 @@ using Test
                 for mm in 0:nmax
                     if mm == 0
                         T0, _ = TMatrix.Wrapper.tmatr0(ngauss, nmax, np, a_to_c, λ, m, rev)
-                        T, _ = TMatrix.tmatr0(scatterer, ngauss, nmax)
+                        T, _ = TMatrix.tmatr0!(scatterer, ngauss, nmax)
                     else
                         T0, _ = TMatrix.Wrapper.tmatr(mm, ngauss, nmax, np, a_to_c, λ, m, rev)
-                        T, _ = TMatrix.tmatr(scatterer, mm, ngauss, nmax)
+                        T, _ = TMatrix.tmatr!(scatterer, mm, ngauss, nmax)
                     end
                     if !(T ≈ T0)
                         valid = false
@@ -421,10 +421,10 @@ using Test
                 for mm in 0:nmax
                     if mm == 0
                         T0, _ = TMatrix.Wrapper.tmatr0(ngauss, nmax, np, d_to_h, λ, m, rev)
-                        T, _ = TMatrix.tmatr0(scatterer, ngauss, nmax)
+                        T, _ = TMatrix.tmatr0!(scatterer, ngauss, nmax)
                     else
                         T0, _ = TMatrix.Wrapper.tmatr(mm, ngauss, nmax, np, d_to_h, λ, m, rev)
-                        T, _ = TMatrix.tmatr(scatterer, mm, ngauss, nmax)
+                        T, _ = TMatrix.tmatr!(scatterer, mm, ngauss, nmax)
                     end
                     if !(T ≈ T0)
                         valid = false
@@ -455,10 +455,10 @@ using Test
                 for mm in 0:nmax
                     if mm == 0
                         T0, _ = TMatrix.Wrapper.tmatr0(ngauss, nmax, np, ε, λ, m, rev)
-                        T, _ = TMatrix.tmatr0(scatterer, ngauss, nmax)
+                        T, _ = TMatrix.tmatr0!(scatterer, ngauss, nmax)
                     else
                         T0, _ = TMatrix.Wrapper.tmatr(mm, ngauss, nmax, np, ε, λ, m, rev)
-                        T, _ = TMatrix.tmatr(scatterer, mm, ngauss, nmax)
+                        T, _ = TMatrix.tmatr!(scatterer, mm, ngauss, nmax)
                     end
                     if !(T ≈ T0)
                         valid = false

@@ -56,7 +56,7 @@ function rsp1(ngauss::Int, rev::Float64, e::Float64)
     dr = zeros(ngauss)
 
     np = -1
-    x, _ = const_(ngauss, 1, np, e)
+    x, _ = constant(ngauss, 1, np, e)
 
     ccall(
         Libdl.dlsym(TM_LIB[], :rsp1_),
@@ -79,7 +79,7 @@ function rsp2(ngauss::Int64, rev::Float64, e::Float64, n::Int64)
     dr = zeros(ngauss)
 
     np = n
-    x, _ = const_(ngauss, 1, np, e)
+    x, _ = constant(ngauss, 1, np, e)
 
     ccall(
         Libdl.dlsym(TM_LIB[], :rsp2_),
@@ -101,7 +101,7 @@ function rsp3(ngauss::Int64, rev::Float64, e::Float64)
     dr = zeros(ngauss)
 
     np = -2
-    x, _ = const_(ngauss, 1, np, e)
+    x, _ = constant(ngauss, 1, np, e)
 
     ccall(
         Libdl.dlsym(TM_LIB[], :rsp3_),
@@ -118,7 +118,7 @@ function rsp3(ngauss::Int64, rev::Float64, e::Float64)
     return r, dr
 end
 
-function const_(ngauss::Int64, nmax::Int64, np::Int64, e::Float64)
+function constant(ngauss::Int64, nmax::Int64, np::Int64, e::Float64)
     x = zeros(NPNG2)
     w = zeros(NPNG2)
     an = zeros(NPN1)
@@ -336,7 +336,7 @@ function cjb(x::ComplexF64, n::Int64, nn::Int64)
 end
 
 function tmatr0(ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ::Float64, m::ComplexF64, rev::Float64)
-    x, w, an, ann, s, ss = const_(ngauss, nmax, np, e)
+    x, w, an, ann, s, ss = constant(ngauss, nmax, np, e)
     ppi, pir, pii, r, dr, ddr, drr, dri, _ = vary(x, λ, m, rev, e, np, ngauss, nmax)
 
     ncheck = zeros(Int32, 1)
@@ -407,7 +407,7 @@ function tmatr0(ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ::Float64, 
 end
 
 function tmatr(mm::Int64, ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ::Float64, m::ComplexF64, rev::Float64)
-    x, w, an, ann, s, ss = const_(ngauss, nmax, np, e)
+    x, w, an, ann, s, ss = constant(ngauss, nmax, np, e)
     ppi, pir, pii, r, dr, ddr, drr, dri, _ = vary(x, λ, m, rev, e, np, ngauss, nmax)
 
     ncheck = zeros(Int32, 1)
