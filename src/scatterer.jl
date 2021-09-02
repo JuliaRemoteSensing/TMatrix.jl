@@ -27,24 +27,16 @@ mutable struct ScattererInfo{T<:Real}
     dhkr::Array{Complex{T},2} # (ngauss, nmax)
     jkr_s::Array{Complex{T},2} # (ngauss, nmax)
     djkr_s::Array{Complex{T},2} # (ngauss, nmax)
-    J11::Array{Complex{T},2}
-    J12::Array{Complex{T},2}
-    J21::Array{Complex{T},2}
-    J22::Array{Complex{T},2}
-    RgJ11::Array{Complex{T},2}
-    RgJ12::Array{Complex{T},2}
-    RgJ21::Array{Complex{T},2}
-    RgJ22::Array{Complex{T},2}
-    Q11::Array{Complex{T},2}
-    Q12::Array{Complex{T},2}
-    Q21::Array{Complex{T},2}
-    Q22::Array{Complex{T},2}
-    Q::Array{Complex{T},2}
-    RgQ11::Array{Complex{T},2}
-    RgQ12::Array{Complex{T},2}
-    RgQ21::Array{Complex{T},2}
-    RgQ22::Array{Complex{T},2}
-    RgQ::Array{Complex{T},2}
+    J11::Array{Complex{T},2} # (nmax, nmax)
+    J12::Array{Complex{T},2} # (nmax, nmax)
+    J21::Array{Complex{T},2} # (nmax, nmax)
+    J22::Array{Complex{T},2} # (nmax, nmax)
+    RgJ11::Array{Complex{T},2} # (nmax, nmax)
+    RgJ12::Array{Complex{T},2} # (nmax, nmax)
+    RgJ21::Array{Complex{T},2} # (nmax, nmax)
+    RgJ22::Array{Complex{T},2} # (nmax, nmax)
+    Q::Array{Complex{T},2} # (2nmax, 2nmax)
+    RgQ::Array{Complex{T},2} # (2nmax, 2nmax)
 end
 
 function ScattererInfo(T)
@@ -79,15 +71,7 @@ function ScattererInfo(T)
         zeros(Complex{T}, NPN1, NPN1),
         zeros(Complex{T}, NPN1, NPN1),
         zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
         zeros(Complex{T}, 2NPN1, 2NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
         zeros(Complex{T}, 2NPN1, 2NPN1),
     )
 end
@@ -736,15 +720,7 @@ function update!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
             info.RgJ12 = zeros(Complex{T}, info.ncap, info.ncap)
             info.RgJ21 = zeros(Complex{T}, info.ncap, info.ncap)
             info.RgJ22 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.Q11 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.Q12 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.Q21 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.Q22 = zeros(Complex{T}, info.ncap, info.ncap)
             info.Q = zeros(Complex{T}, 2info.ncap, 2info.ncap)
-            info.RgQ11 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.RgQ12 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.RgQ21 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.RgQ22 = zeros(Complex{T}, info.ncap, info.ncap)
             info.RgQ = zeros(Complex{T}, 2info.ncap, 2info.ncap)
         end
 
@@ -972,17 +948,13 @@ function tmatr0!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
 
     # Since T = -RgQ⋅Q', the coefficient -i of Q and RgQ can be cancelled out.
 
-    Q11 = view(info.Q11, 1:nmax, 1:nmax)
-    Q22 = view(info.Q22, 1:nmax, 1:nmax)
     Q = view(info.Q, 1:(2nmax), 1:(2nmax))
-    RgQ11 = view(info.RgQ11, 1:nmax, 1:nmax)
-    RgQ22 = view(info.RgQ22, 1:nmax, 1:nmax)
+    Q11 = view(Q, 1:nmax, 1:nmax)
+    Q22 = view(Q, (nmax+1):2nmax, (nmax+1):2nmax)
     RgQ = view(info.RgQ, 1:(2nmax), 1:(2nmax))
-    fill!(Q11, zero(eltype(Q11)))
-    fill!(Q22, zero(eltype(Q22)))
+    RgQ11 = view(RgQ, 1:nmax, 1:nmax)
+    RgQ22 = view(RgQ, (nmax+1):2nmax, (nmax+1):2nmax)
     fill!(Q, zero(eltype(Q)))
-    fill!(RgQ11, zero(eltype(RgQ11)))
-    fill!(RgQ22, zero(eltype(RgQ22)))
     fill!(RgQ, zero(eltype(RgQ)))
 
     Q11 .= kk_s * J21 + kk * J12
@@ -990,12 +962,6 @@ function tmatr0!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
 
     RgQ11 .= kk_s * RgJ21 + kk * RgJ12
     RgQ22 .= kk_s * RgJ12 + kk * RgJ21
-
-    Q[1:nmax, 1:nmax] .= Q11[1:nmax, 1:nmax]
-    Q[(nmax + 1):(2nmax), (nmax + 1):(2nmax)] .= Q22[1:nmax, 1:nmax]
-
-    RgQ[1:nmax, 1:nmax] .= RgQ11[1:nmax, 1:nmax]
-    RgQ[(nmax + 1):(2nmax), (nmax + 1):(2nmax)] .= RgQ22[1:nmax, 1:nmax]
 
     T = -RgQ * inv(Q)
 
@@ -1008,6 +974,7 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
     update!(scatterer, ngauss, nmax)
 
     info = scatterer.info
+    mm = max(m, 1)
     an = view(info.an, 1:nmax)
     ann = view(info.ann, 1:nmax, 1:nmax)
     sig = view(info.sig, 1:nmax)
@@ -1026,7 +993,6 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
         p[ineg, :] = p[i, :] .* sig
     end
 
-    mm = max(m, 1)
     ngss = sym ? (ngauss ÷ 2) : ngauss
     w = view(info.w, 1:ngss)
     r = view(info.r, 1:ngss)
@@ -1042,14 +1008,14 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
     jkr_s = view(info.jkr_s, 1:ngss, 1:nmax)
     djkr_s = view(info.djkr_s, 1:ngss, 1:nmax)
 
-    J11 = view(info.J11, 1:nmax, 1:nmax)
-    J12 = view(info.J12, 1:nmax, 1:nmax)
-    J21 = view(info.J21, 1:nmax, 1:nmax)
-    J22 = view(info.J22, 1:nmax, 1:nmax)
-    RgJ11 = view(info.RgJ11, 1:nmax, 1:nmax)
-    RgJ12 = view(info.RgJ12, 1:nmax, 1:nmax)
-    RgJ21 = view(info.RgJ21, 1:nmax, 1:nmax)
-    RgJ22 = view(info.RgJ22, 1:nmax, 1:nmax)
+    J11 = view(info.J11, mm:nmax, mm:nmax)
+    J12 = view(info.J12, mm:nmax, mm:nmax)
+    J21 = view(info.J21, mm:nmax, mm:nmax)
+    J22 = view(info.J22, mm:nmax, mm:nmax)
+    RgJ11 = view(info.RgJ11, mm:nmax, mm:nmax)
+    RgJ12 = view(info.RgJ12, mm:nmax, mm:nmax)
+    RgJ21 = view(info.RgJ21, mm:nmax, mm:nmax)
+    RgJ22 = view(info.RgJ22, mm:nmax, mm:nmax)
     fill!(J11, zero(eltype(J11)))
     fill!(J12, zero(eltype(J12)))
     fill!(J21, zero(eltype(J21)))
@@ -1059,13 +1025,22 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
     fill!(RgJ21, zero(eltype(RgJ21)))
     fill!(RgJ22, zero(eltype(RgJ22)))
 
+    OffsetJ11 = OffsetArray(J11, mm:nmax, mm:nmax)
+    OffsetJ12 = OffsetArray(J12, mm:nmax, mm:nmax)
+    OffsetJ21 = OffsetArray(J21, mm:nmax, mm:nmax)
+    OffsetJ22 = OffsetArray(J22, mm:nmax, mm:nmax)
+    OffsetRgJ11 = OffsetArray(RgJ11, mm:nmax, mm:nmax)
+    OffsetRgJ12 = OffsetArray(RgJ12, mm:nmax, mm:nmax)
+    OffsetRgJ21 = OffsetArray(RgJ21, mm:nmax, mm:nmax)
+    OffsetRgJ22 = OffsetArray(RgJ22, mm:nmax, mm:nmax)
+
     for n2 in mm:nmax
         for n1 in mm:nmax
             for i in 1:ngss
                 if !(sym && (n1 + n2) % 2 == 0)
-                    J11[n1, n2] += wr2[i] * hkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
+                    OffsetJ11[n1, n2] += wr2[i] * hkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
 
-                    J22[n1, n2] +=
+                    OffsetJ22[n1, n2] +=
                         wr2[i] * (
                             dhkr[i, n1] * djkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2]) +
                             dr[i] / r[i] *
@@ -1077,9 +1052,9 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
                             d[i, n2]
                         )
 
-                    RgJ11[n1, n2] += wr2[i] * jkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
+                    OffsetRgJ11[n1, n2] += wr2[i] * jkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
 
-                    RgJ22[n1, n2] +=
+                    OffsetRgJ22[n1, n2] +=
                         wr2[i] * (
                             djkr[i, n1] * djkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2]) +
                             dr[i] / r[i] *
@@ -1093,7 +1068,7 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
                 end
 
                 if !(sym && (n1 + n2) % 2 == 1)
-                    J12[n1, n2] +=
+                    OffsetJ12[n1, n2] +=
                         wr2[i] *
                         jkr_s[i, n2] *
                         (
@@ -1101,7 +1076,7 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
                             dr[i] / r[i] * an[n1] * hkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
                         )
 
-                    J21[n1, n2] +=
+                    OffsetJ21[n1, n2] +=
                         wr2[i] *
                         hkr[i, n1] *
                         (
@@ -1109,7 +1084,7 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
                             dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
                         )
 
-                    RgJ12[n1, n2] +=
+                    OffsetRgJ12[n1, n2] +=
                         wr2[i] *
                         jkr_s[i, n2] *
                         (
@@ -1117,7 +1092,7 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
                             dr[i] / r[i] * an[n1] * jkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
                         )
 
-                    RgJ21[n1, n2] +=
+                    OffsetRgJ21[n1, n2] +=
                         wr2[i] *
                         jkr[i, n1] *
                         (
@@ -1129,6 +1104,7 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
         end
     end
 
+    ann = view(ann, mm:nmax, mm:nmax)
     J11 .*= -ann
     J12 .*= -1.0im * ann
     J21 .*= 1.0im * ann
@@ -1145,25 +1121,17 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
     kk_s = k * k_s
 
     nm = nmax - mm + 1
-    Q11 = view(info.Q11, 1:nmax, 1:nmax)
-    Q12 = view(info.Q12, 1:nmax, 1:nmax)
-    Q21 = view(info.Q21, 1:nmax, 1:nmax)
-    Q22 = view(info.Q22, 1:nmax, 1:nmax)
     Q = view(info.Q, 1:(2nm), 1:(2nm))
-    RgQ11 = view(info.RgQ11, 1:nmax, 1:nmax)
-    RgQ12 = view(info.RgQ12, 1:nmax, 1:nmax)
-    RgQ21 = view(info.RgQ21, 1:nmax, 1:nmax)
-    RgQ22 = view(info.RgQ22, 1:nmax, 1:nmax)
+    Q11 = view(Q, 1:nm, 1:nm)
+    Q12 = view(Q, 1:nm, (nm+1):2nm)
+    Q21 = view(Q, (nm+1):2nm, 1:nm)
+    Q22 = view(Q, (nm+1):2nm, (nm+1):2nm)
     RgQ = view(info.RgQ, 1:(2nm), 1:(2nm))
-    fill!(Q11, zero(eltype(Q11)))
-    fill!(Q12, zero(eltype(Q12)))
-    fill!(Q21, zero(eltype(Q21)))
-    fill!(Q22, zero(eltype(Q22)))
+    RgQ11 = view(RgQ, 1:nm, 1:nm)
+    RgQ12 = view(RgQ, 1:nm, (nm+1):2nm)
+    RgQ21 = view(RgQ, (nm+1):2nm, 1:nm)
+    RgQ22 = view(RgQ, (nm+1):2nm, (nm+1):2nm)
     fill!(Q, zero(eltype(Q)))
-    fill!(RgQ11, zero(eltype(RgQ11)))
-    fill!(RgQ12, zero(eltype(RgQ12)))
-    fill!(RgQ21, zero(eltype(RgQ21)))
-    fill!(RgQ22, zero(eltype(RgQ22)))
     fill!(RgQ, zero(eltype(RgQ)))
 
     # Since T = -RgQ⋅Q', the coefficient -i of Q and RgQ can be cancelled out.
@@ -1177,16 +1145,6 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
     RgQ12 .= kk_s * RgJ11 + kk * RgJ22
     RgQ21 .= kk_s * RgJ22 + kk * RgJ11
     RgQ22 .= kk_s * RgJ12 + kk * RgJ21
-
-    Q[1:nm, 1:nm] .= Q11[mm:nmax, mm:nmax]
-    Q[1:nm, (nm + 1):(2nm)] .= Q12[mm:nmax, mm:nmax]
-    Q[(nm + 1):(2nm), 1:nm] .= Q21[mm:nmax, mm:nmax]
-    Q[(nm + 1):(2nm), (nm + 1):(2nm)] .= Q22[mm:nmax, mm:nmax]
-
-    RgQ[1:nm, 1:nm] .= RgQ11[mm:nmax, mm:nmax]
-    RgQ[1:nm, (nm + 1):(2nm)] .= RgQ12[mm:nmax, mm:nmax]
-    RgQ[(nm + 1):(2nm), 1:nm] .= RgQ21[mm:nmax, mm:nmax]
-    RgQ[(nm + 1):(2nm), (nm + 1):(2nm)] .= RgQ22[mm:nmax, mm:nmax]
 
     T = -RgQ * inv(Q)
 
