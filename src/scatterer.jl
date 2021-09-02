@@ -583,31 +583,56 @@ function calc_SZ(
     return S, Z
 end
 
+function r_split!(scatterer::AbstractScatterer, ngauss::Int64, x::AbstractArray, w::AbstractArray)
+    if typeof(scatterer) <: Cylinder
+        ng = ngauss ÷ 2
+        ng1 = ng ÷ 2
+        ng2 = ng - ng1
+        x1, w1 = gausslegendre(ng1)
+        x2, w2 = gausslegendre(ng2)
+        xx = -cos(atan(scatterer.d_to_h))
+        x[1:ng1] .= 0.5(xx + 1.0) .* x1 .+ 0.5(xx - 1.0)
+        w[1:ng1] .= 0.5(xx + 1.0) .* w1
+        x[(ng1 + 1):ng] .= -0.5xx .* x2 .+ 0.5xx
+        w[(ng1 + 1):ng] .= -0.5xx .* w2
+        x[(ng + 1):ngauss] .= (-1.0) .* x[ng:-1:1]
+        w[(ng + 1):ngauss] .= w[ng:-1:1]
+    else
+        x0, w0 = gausslegendre(ngauss)
+        x .= x0
+        w .= w0
+    end
+end
+
+function r_split(scatterer::AbstractScatterer, ngauss::Int64)
+    x = zeros(ngauss)
+    w = zeros(ngauss)
+    r_split!(scatterer, ngauss, x, w)
+    return x, w
+end
+
 @doc raw"""
 ```
-calc_r!(scatterer::Scatterer, ngauss::Int64, r::AbstractArray{Float64}, dr::AbstractArray{Float64})
+calc_r!(scatterer::Scatterer, ngauss::Int64, x::AbstractArray, w::AbstractArray, r::AbstractArray, dr::AbstractArray)
 ```
 
 Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` points for a given scatterer.
 """
-function calc_r!(scatterer::AbstractScatterer, ngauss::Int64, r::AbstractArray{Float64}, dr::AbstractArray{Float64})
+function calc_r!(
+    scatterer::AbstractScatterer,
+    ngauss::Int64,
+    x::AbstractArray,
+    w::AbstractArray,
+    r::AbstractArray,
+    dr::AbstractArray,
+)
+    r_split!(scatterer, ngauss, x, w)
     rev = scatterer.rev
 
     if typeof(scatterer) <: Cylinder
         if ngauss % 2 != 0
             error("Constraint violated: ngauss should be even for cylinders")
         end
-
-        # For cylinders, r(theta) is not continuous, thus must be handled separately.
-        ng1 = ngauss ÷ 4
-        ng2 = ngauss ÷ 2 - ng1
-        x1, _ = gausslegendre(ng1)
-        x2, _ = gausslegendre(ng2)
-        x = zeros(ngauss)
-        xx = -cos(atan(scatterer.d_to_h))
-        x[1:ng1] = 0.5(xx + 1.0) .* x1 .+ 0.5(xx - 1.0)
-        x[(ng1 + 1):(ng1 + ng2)] = -0.5xx .* x2 .+ 0.5xx
-        x[(ngauss ÷ 2 + 1):ngauss] = -x[(ngauss ÷ 2):-1:1]
 
         e = scatterer.d_to_h
         h = rev * ∛(2 / (3e^2))
@@ -633,8 +658,6 @@ function calc_r!(scatterer::AbstractScatterer, ngauss::Int64, r::AbstractArray{F
             error("Constraint violated: ngauss should be even for spheroids")
         end
 
-        x, _ = gausslegendre(ngauss)
-
         e = scatterer.a_to_c
         a = rev * ∛e
 
@@ -651,8 +674,6 @@ function calc_r!(scatterer::AbstractScatterer, ngauss::Int64, r::AbstractArray{F
         e = scatterer.ε
         n = scatterer.n
         dn = float(n)
-
-        x, _ = gausslegendre(ngauss)
 
         a = 1.5e^2 * (4.0dn^2 - 2.0) / (4.0dn^2 - 1.0) + 1.0
 
@@ -679,9 +700,11 @@ Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` poi
 """
 function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
     rev = scatterer.rev
+    x = zeros(ngauss)
+    w = zeros(ngauss)
     r = zeros(ngauss)
     dr = zeros(ngauss)
-    calc_r!(scatterer, ngauss, r, dr)
+    calc_r!(scatterer, ngauss, x, w, r, dr)
     return r, dr
 end
 
@@ -755,30 +778,17 @@ function update!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     k = 2π / scatterer.λ
 
     if ngauss != info.ngauss
-        if typeof(scatterer) <: Cylinder
-            ng = ngauss ÷ 2
-            ng1 = ng ÷ 2
-            ng2 = ng - ng1
-            x1, w1 = gausslegendre(ng1)
-            x2, w2 = gausslegendre(ng2)
-            xx = -cos(atan(scatterer.d_to_h))
-            info.x[1:ng1] = 0.5(xx + 1.0) * x1 .+ 0.5(xx - 1.0)
-            info.w[1:ng1] = 0.5(xx + 1.0) * w1
-            info.x[(ng1 + 1):ng] = -0.5xx * x2 .+ 0.5xx
-            info.w[(ng1 + 1):ng] = -0.5xx * w2
-            info.x[(ng + 1):ngauss] = -info.x[ng:-1:1]
-            info.w[(ng + 1):ngauss] = info.w[ng:-1:1]
-        else
-            x, w = gausslegendre(ngauss)
-            info.x[1:ngauss] = x
-            info.w[1:ngauss] = w
-        end
-
-        info.s[1:ngauss] = 1 ./ (sin ∘ acos).(info.x[1:ngauss])
-
-        calc_r!(scatterer, ngauss, info.r, info.dr)
-        info.kr1[1:ngauss] = 1.0 ./ (k * info.r[1:ngauss])
-        info.kr_s1[1:ngauss] = 1.0 ./ (scatterer.m * k * info.r[1:ngauss])
+        calc_r!(
+            scatterer,
+            ngauss,
+            view(info.x, 1:ngauss),
+            view(info.w, 1:ngauss),
+            view(info.r, 1:ngauss),
+            view(info.dr, 1:ngauss),
+        )
+        info.s[1:ngauss] .= 1 ./ (sin ∘ acos).(info.x[1:ngauss])
+        info.kr1[1:ngauss] .= 1.0 ./ (k * info.r[1:ngauss])
+        info.kr_s1[1:ngauss] .= 1.0 ./ (scatterer.m * k .* info.r[1:ngauss])
     end
 
     # The rest need to be recalculated when either `ngauss` or `nmax` changes.
