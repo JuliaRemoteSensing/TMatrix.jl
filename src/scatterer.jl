@@ -1,9 +1,13 @@
 @enum Shape SHAPE_SPHEROID SHAPE_CYLINDER SHAPE_CHEBYSHEV
 @enum RadiusType RADIUS_EQUAL_VOLUME RADIUS_EQUAL_AREA RADIUS_MAXIMUM
 
-const NPN1 = 100
-const NPNG1 = 500
+const DEFAULT_NCAP = 100
+const DEFAULT_NGCAP = 500
+const CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS = 60
 
+@doc raw"""
+Accompanied information of a scatterer.
+"""
 mutable struct ScattererInfo{T<:Real}
     nmax::Int64
     ngauss::Int64
@@ -44,51 +48,58 @@ mutable struct ScattererInfo{T<:Real}
     RgQ::Array{Complex{T},2} # (2nmax, 2nmax)
 end
 
+@doc raw"""
+Constructor of `ScattererInfo`.
+"""
 function ScattererInfo(T)
     return ScattererInfo(
         0,
         0,
-        NPN1,
-        NPNG1,
-        [T(n * (n + 1)) for n in 1:NPN1],
-        [T(0.5 * √((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1)))) for n1 in 1:NPN1, n2 in 1:NPN1],
-        [i % 2 == 1 ? T(-1.0) : T(1.0) for i in 1:NPN1],
-        zeros(T, NPNG1),
-        zeros(T, NPNG1),
-        zeros(T, NPNG1),
-        zeros(T, NPNG1),
-        zeros(T, NPNG1),
-        zeros(T, NPNG1),
-        zeros(Complex{T}, NPNG1),
-        zeros(T, NPNG1, NPN1),
-        zeros(T, NPNG1, NPN1),
-        zeros(T, NPNG1, NPN1),
-        zeros(T, NPNG1, NPN1),
-        zeros(T, NPNG1, NPN1),
-        zeros(T, 2NPN1),
-        zeros(T, NPNG1, NPN1),
-        zeros(T, NPNG1, NPN1),
-        zeros(Complex{T}, NPNG1, NPN1),
-        zeros(Complex{T}, NPNG1, NPN1),
-        zeros(Complex{T}, NPNG1, NPN1),
-        zeros(Complex{T}, NPNG1, NPN1),
-        zeros(Complex{T}, 2NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, NPN1, NPN1),
-        zeros(Complex{T}, 2NPN1, 2NPN1),
-        zeros(Complex{T}, 2NPN1, 2NPN1),
+        DEFAULT_NCAP,
+        DEFAULT_NGCAP,
+        [T(n * (n + 1)) for n in 1:DEFAULT_NCAP],
+        [
+            T(0.5 * √((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1)))) for n1 in 1:DEFAULT_NCAP,
+            n2 in 1:DEFAULT_NCAP
+        ],
+        [i % 2 == 1 ? T(-1.0) : T(1.0) for i in 1:DEFAULT_NCAP],
+        zeros(T, DEFAULT_NGCAP),
+        zeros(T, DEFAULT_NGCAP),
+        zeros(T, DEFAULT_NGCAP),
+        zeros(T, DEFAULT_NGCAP),
+        zeros(T, DEFAULT_NGCAP),
+        zeros(T, DEFAULT_NGCAP),
+        zeros(Complex{T}, DEFAULT_NGCAP),
+        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
+        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
+        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
+        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
+        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
+        zeros(T, 2DEFAULT_NCAP),
+        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
+        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
+        zeros(Complex{T}, DEFAULT_NGCAP, DEFAULT_NCAP),
+        zeros(Complex{T}, DEFAULT_NGCAP, DEFAULT_NCAP),
+        zeros(Complex{T}, DEFAULT_NGCAP, DEFAULT_NCAP),
+        zeros(Complex{T}, DEFAULT_NGCAP, DEFAULT_NCAP),
+        zeros(Complex{T}, 2DEFAULT_NCAP),
+        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
+        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
+        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
+        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
+        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
+        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
+        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
+        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
+        zeros(Complex{T}, 2DEFAULT_NCAP, 2DEFAULT_NCAP),
+        zeros(Complex{T}, 2DEFAULT_NCAP, 2DEFAULT_NCAP),
     )
 end
 
+@doc raw"""
+Abstract type for all scatterers.
+"""
 abstract type AbstractScatterer end
-
-const CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS = 60
 
 @doc raw"""
 A spheroid scatterer.
@@ -337,15 +348,15 @@ function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64 = 0.0001)
     @debug "Convergence reached" nmax ngauss
 
     T0, _ = tmatr0!(scatterer, ngauss, nmax)
-    T = [T0]
-    for mm in 1:nmax
-        Tmm, _ = tmatr!(scatterer, mm, ngauss, nmax)
-        push!(T, Tmm)
+    TT = [T0]
+    for m in 1:nmax
+        Tm, _ = tmatr!(scatterer, m, ngauss, nmax)
+        push!(TT, Tm)
     end
 
-    @debug "Cross section" cross_section(T, scatterer.λ)
+    @debug "Cross section" cross_section(TT, scatterer.λ)
 
-    return T
+    return TT
 end
 
 @doc raw"""
@@ -819,25 +830,9 @@ function constant(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     an = [Float64(n * (n + 1)) for n in 1:nmax]
     ann = [0.5 * √((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1))) for n1 in 1:nmax, n2 in 1:nmax]
 
-    if typeof(scatterer) <: Cylinder
-        ng = ngauss ÷ 2
-        ng1 = ng ÷ 2
-        ng2 = ng - ng1
-        x1, w1 = gausslegendre(ng1)
-        x2, w2 = gausslegendre(ng2)
-        x = zeros(ngauss)
-        w = zeros(ngauss)
-        xx = -cos(atan(scatterer.d_to_h))
-        x[1:ng1] = 0.5(xx + 1.0) * x1 .+ 0.5(xx - 1.0)
-        w[1:ng1] = 0.5(xx + 1.0) * w1
-        x[(ng1 + 1):ng] = -0.5xx * x2 .+ 0.5xx
-        w[(ng1 + 1):ng] = -0.5xx * w2
-        x[(ng + 1):ngauss] = -x[ng:-1:1]
-        w[(ng + 1):ngauss] = w[ng:-1:1]
-    else
-        x, w = gausslegendre(ngauss)
-    end
-
+    x = zeros(ngauss)
+    w = zeros(ngauss)
+    r_split!(scatterer, ngauss, x, w)
     s = 1 ./ (sin ∘ acos).(x)
     ss = s .^ 2
 
@@ -866,11 +861,13 @@ function vary(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     dykr = zeros(T, ngauss, nmax)
     jkr_s = zeros(Complex{T}, ngauss, nmax)
     djkr_s = zeros(Complex{T}, ngauss, nmax)
+    j_tmp = zeros(T, 2nmax)
+    j_s_tmp = zeros(Complex{T}, 2nmax)
 
     for i in 1:ngauss
-        jkr[i, :], djkr[i, :] = sphericalbesselj(kr[i], nmax, nnmax1)
-        ykr[i, :], dykr[i, :] = sphericalbessely(kr[i], nmax)
-        jkr_s[i, :], djkr_s[i, :] = sphericalbesselj(kr_s[i], nmax, nnmax2)
+        sphericalbesselj!(kr[i], nmax, nnmax1, view(jkr, i, :), view(djkr, i, :), j_tmp)
+        sphericalbessely!(kr[i], nmax, view(ykr, i, :), view(dykr, i, :))
+        sphericalbesselj!(kr_s[i], nmax, nnmax2, view(jkr_s, i, :), view(djkr_s, i, :), j_s_tmp)
     end
 
     return r, dr, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s
@@ -988,9 +985,9 @@ function tmatr0!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     RgQ11 .= kk_s * RgJ21 + kk * RgJ12
     RgQ22 .= kk_s * RgJ12 + kk * RgJ21
 
-    T = -RgQ * inv(Q)
+    T0 = -RgQ * inv(Q)
 
-    return T, Q, RgQ
+    return T0, Q, RgQ
 end
 
 function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int64)
@@ -1174,7 +1171,7 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
     RgQ21 .= kk_s * RgJ22 + kk * RgJ11
     RgQ22 .= kk_s * RgJ12 + kk * RgJ21
 
-    T = -RgQ * inv(Q)
+    Tm = -RgQ * inv(Q)
 
-    return T, Q, RgQ
+    return Tm, Q, RgQ
 end
