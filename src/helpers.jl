@@ -72,9 +72,8 @@ function vigampl(nmax::Int64, m::Int64, x::T) where {T<:Real}
     return dv1, dv2
 end
 
-function sphericalbesselj!(x::T, nmax::Int64, nnmax1::Int64, y::AbstractArray, u::AbstractArray) where {T<:Number}
+function sphericalbesselj!(x::T, nmax::Int64, nnmax1::Int64, y::AbstractArray, u::AbstractArray, z::AbstractArray) where {T<:Number}
     l = nmax + nnmax1
-    z = zeros(T, l)
     x1 = 1.0 / x
     z[l] = x / (2l + 1)
     for i in (l - 1):-1:1
@@ -93,7 +92,8 @@ end
 function sphericalbesselj(x::T, nmax::Int64, nnmax1::Int64) where {T<:Number}
     y = zeros(T, nmax)
     u = zeros(T, nmax)
-    sphericalbesselj!(x, nmax, nnmax1, y, u)
+    z = zeros(T, nmax + nnmax1)
+    sphericalbesselj!(x, nmax, nnmax1, y, u, z)
     return y, u
 end
 

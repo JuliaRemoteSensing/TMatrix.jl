@@ -19,14 +19,19 @@ mutable struct ScattererInfo{T<:Real}
     dr::Array{T,1} # (ngauss,)
     kr1::Array{T,1} # (ngauss,)
     kr_s1::Array{Complex{T},1} # (ngauss,)
+    d::Array{T,2} # (ngauss, nmax)
+    τ::Array{T,2} # (ngauss, nmax)
+    p::Array{T,2} # (ngauss, nmax)
     jkr::Array{T,2} # (ngauss, nmax)
     djkr::Array{T,2} # (ngauss, nmax)
+    j_tmp::Array{T,1} # (2ncap,)
     ykr::Array{T,2} # (ngauss, nmax)
     dykr::Array{T,2} # (ngauss, nmax)
     hkr::Array{Complex{T},2} # (ngauss, nmax)
     dhkr::Array{Complex{T},2} # (ngauss, nmax)
     jkr_s::Array{Complex{T},2} # (ngauss, nmax)
     djkr_s::Array{Complex{T},2} # (ngauss, nmax)
+    j_s_tmp::Array{Complex{T},1} # (2ncap,)
     J11::Array{Complex{T},2} # (nmax, nmax)
     J12::Array{Complex{T},2} # (nmax, nmax)
     J21::Array{Complex{T},2} # (nmax, nmax)
@@ -59,10 +64,15 @@ function ScattererInfo(T)
         zeros(T, NPNG1, NPN1),
         zeros(T, NPNG1, NPN1),
         zeros(T, NPNG1, NPN1),
+        zeros(T, NPNG1, NPN1),
+        zeros(T, 2NPN1),
+        zeros(T, NPNG1, NPN1),
+        zeros(T, NPNG1, NPN1),
         zeros(Complex{T}, NPNG1, NPN1),
         zeros(Complex{T}, NPNG1, NPN1),
         zeros(Complex{T}, NPNG1, NPN1),
         zeros(Complex{T}, NPNG1, NPN1),
+        zeros(Complex{T}, 2NPN1),
         zeros(Complex{T}, NPN1, NPN1),
         zeros(Complex{T}, NPN1, NPN1),
         zeros(Complex{T}, NPN1, NPN1),
@@ -712,6 +722,8 @@ function update!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
         end
 
         if info.ncap > ncap
+            info.j_tmp = zeros(T, 2info.ncap)
+            info.j_s_tmp = zeros(Complex{T}, 2info.ncap)
             info.J11 = zeros(Complex{T}, info.ncap, info.ncap)
             info.J12 = zeros(Complex{T}, info.ncap, info.ncap)
             info.J21 = zeros(Complex{T}, info.ncap, info.ncap)
@@ -725,6 +737,9 @@ function update!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
         end
 
         if info.ncap > ncap || info.ngcap > ngcap
+            info.d = zeros(T, info.ngcap, info.ncap)
+            info.τ = zeros(T, info.ngcap, info.ncap)
+            info.p = zeros(T, info.ngcap, info.ncap)
             info.jkr = zeros(T, info.ngcap, info.ncap)
             info.djkr = zeros(T, info.ngcap, info.ncap)
             info.ykr = zeros(T, info.ngcap, info.ncap)
@@ -776,9 +791,9 @@ function update!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     nnmax2 = Int64(floor(tb + 4.0 * ∛tb + 1.2 * √tb - nmax + 5))
 
     for i in 1:ngauss
-        sphericalbesselj!(kr[i], nmax, nnmax1, view(info.jkr, i, :), view(info.djkr, i, :))
+        sphericalbesselj!(kr[i], nmax, nnmax1, view(info.jkr, i, :), view(info.djkr, i, :), info.j_tmp)
         sphericalbessely!(kr[i], nmax, view(info.ykr, i, :), view(info.dykr, i, :))
-        sphericalbesselj!(kr_s[i], nmax, nnmax2, view(info.jkr_s, i, :), view(info.djkr_s, i, :))
+        sphericalbesselj!(kr_s[i], nmax, nnmax2, view(info.jkr_s, i, :), view(info.djkr_s, i, :), info.j_s_tmp)
     end
 
     info.hkr[1:ngauss, 1:nmax] = complex.(view(info.jkr, 1:ngauss, 1:nmax), view(info.ykr, 1:ngauss, 1:nmax))
@@ -862,13 +877,13 @@ function tmatr0!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     sig = view(info.sig, 1:nmax)
     x = view(info.x, 1:ngauss)
 
-    d = zeros(T, ngauss, nmax)
-    τ = zeros(T, ngauss, nmax)
+    d = view(info.d, 1:ngauss, 1:nmax)
+    τ = view(info.τ, 1:ngauss, 1:nmax)
     for i in (ngauss ÷ 2 + 1):ngauss
         ineg = ngauss + 1 - i
         vig!(nmax, 0, x[i], view(d, i, :), view(τ, i, :))
-        d[ineg, :] = view(d, i, :) .* sig
-        τ[ineg, :] = -view(τ, i, :) .* sig
+        d[ineg, :] .= view(d, i, :) .* sig
+        τ[ineg, :] .= view(τ, i, :) .* sig .* (-1.0)
     end
 
     ngss = sym ? (ngauss ÷ 2) : ngauss
@@ -950,10 +965,10 @@ function tmatr0!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
 
     Q = view(info.Q, 1:(2nmax), 1:(2nmax))
     Q11 = view(Q, 1:nmax, 1:nmax)
-    Q22 = view(Q, (nmax+1):2nmax, (nmax+1):2nmax)
+    Q22 = view(Q, (nmax + 1):(2nmax), (nmax + 1):(2nmax))
     RgQ = view(info.RgQ, 1:(2nmax), 1:(2nmax))
     RgQ11 = view(RgQ, 1:nmax, 1:nmax)
-    RgQ22 = view(RgQ, (nmax+1):2nmax, (nmax+1):2nmax)
+    RgQ22 = view(RgQ, (nmax + 1):(2nmax), (nmax + 1):(2nmax))
     fill!(Q, zero(eltype(Q)))
     fill!(RgQ, zero(eltype(RgQ)))
 
@@ -981,16 +996,17 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
     x = view(info.x, 1:ngauss)
     s = view(info.s, 1:ngauss)
 
-    d = zeros(T, ngauss, nmax)
-    p = zeros(T, ngauss, nmax)
-    τ = zeros(T, ngauss, nmax)
+    d = view(info.d, 1:ngauss, 1:nmax)
+    p = view(info.p, 1:ngauss, 1:nmax)
+    τ = view(info.τ, 1:ngauss, 1:nmax)
+
     for i in (ngauss ÷ 2 + 1):ngauss
         ineg = ngauss + 1 - i
         vig!(nmax, m, x[i], view(d, i, :), view(τ, i, :))
-        p[i, :] = m * d[i, :] * s[i]
-        d[ineg, :] = d[i, :] .* sig
-        τ[ineg, :] = -τ[i, :] .* sig
-        p[ineg, :] = p[i, :] .* sig
+        p[i, :] .= view(d, i, :) .* (s[i] * m)
+        d[ineg, :] .= view(d, i, :) .* sig
+        τ[ineg, :] .= view(τ, i, :) .* sig .* (-1.0)
+        p[ineg, :] .= view(p, i, :) .* sig
     end
 
     ngss = sym ? (ngauss ÷ 2) : ngauss
@@ -1038,7 +1054,8 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
         for n1 in mm:nmax
             for i in 1:ngss
                 if !(sym && (n1 + n2) % 2 == 0)
-                    OffsetJ11[n1, n2] += wr2[i] * hkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
+                    OffsetJ11[n1, n2] +=
+                        wr2[i] * hkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
 
                     OffsetJ22[n1, n2] +=
                         wr2[i] * (
@@ -1052,7 +1069,8 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
                             d[i, n2]
                         )
 
-                    OffsetRgJ11[n1, n2] += wr2[i] * jkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
+                    OffsetRgJ11[n1, n2] +=
+                        wr2[i] * jkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
 
                     OffsetRgJ22[n1, n2] +=
                         wr2[i] * (
@@ -1123,14 +1141,14 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
     nm = nmax - mm + 1
     Q = view(info.Q, 1:(2nm), 1:(2nm))
     Q11 = view(Q, 1:nm, 1:nm)
-    Q12 = view(Q, 1:nm, (nm+1):2nm)
-    Q21 = view(Q, (nm+1):2nm, 1:nm)
-    Q22 = view(Q, (nm+1):2nm, (nm+1):2nm)
+    Q12 = view(Q, 1:nm, (nm + 1):(2nm))
+    Q21 = view(Q, (nm + 1):(2nm), 1:nm)
+    Q22 = view(Q, (nm + 1):(2nm), (nm + 1):(2nm))
     RgQ = view(info.RgQ, 1:(2nm), 1:(2nm))
     RgQ11 = view(RgQ, 1:nm, 1:nm)
-    RgQ12 = view(RgQ, 1:nm, (nm+1):2nm)
-    RgQ21 = view(RgQ, (nm+1):2nm, 1:nm)
-    RgQ22 = view(RgQ, (nm+1):2nm, (nm+1):2nm)
+    RgQ12 = view(RgQ, 1:nm, (nm + 1):(2nm))
+    RgQ21 = view(RgQ, (nm + 1):(2nm), 1:nm)
+    RgQ22 = view(RgQ, (nm + 1):(2nm), (nm + 1):(2nm))
     fill!(Q, zero(eltype(Q)))
     fill!(RgQ, zero(eltype(RgQ)))
 
