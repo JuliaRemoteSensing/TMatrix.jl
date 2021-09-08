@@ -75,14 +75,14 @@ function ScattererInfo(T)
         zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
         zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
         zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
-        zeros(T, 2DEFAULT_NCAP),
+        zeros(T, 0),
         zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
         zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
         zeros(Complex{T}, DEFAULT_NGCAP, DEFAULT_NCAP),
         zeros(Complex{T}, DEFAULT_NGCAP, DEFAULT_NCAP),
         zeros(Complex{T}, DEFAULT_NGCAP, DEFAULT_NCAP),
         zeros(Complex{T}, DEFAULT_NGCAP, DEFAULT_NCAP),
-        zeros(Complex{T}, 2DEFAULT_NCAP),
+        zeros(Complex{T}, 0),
         zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
         zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
         zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
@@ -99,7 +99,7 @@ end
 @doc raw"""
 Abstract type for all scatterers.
 """
-abstract type AbstractScatterer end
+abstract type AbstractScatterer{T<:Real} end
 
 @doc raw"""
 A spheroid scatterer.
@@ -112,7 +112,7 @@ Attributes:
 - `λ`: The wavelength of the incident wave.
 - `info`: The accompanied information.
 """
-struct Spheroid{T<:Real} <: AbstractScatterer
+struct Spheroid{T<:Real} <: AbstractScatterer{T}
     rev::T
     m::Complex{T}
     a_to_c::T
@@ -130,7 +130,7 @@ Attributes:
 - `d_to_h`: The diameter-to-height ratio $D/H$.
 - `λ`: The wavelength of the incident wave.
 """
-struct Cylinder{T<:Real} <: AbstractScatterer
+struct Cylinder{T<:Real} <: AbstractScatterer{T}
     rev::T
     m::Complex{T}
     d_to_h::T
@@ -153,7 +153,7 @@ Attributes:
 - `n`: The degree of the Chebyshev polynomial.
 - `λ`: The wavelength of the incident wave.
 """
-struct Chebyshev{T<:Real} <: AbstractScatterer
+struct Chebyshev{T<:Real} <: AbstractScatterer{T}
     rev::T
     m::Complex{T}
     ε::T
@@ -176,19 +176,25 @@ Parameters:
 - `n`: Degree of the Chebyshev polynomial. Required only for Chebyshev particles.
 
 """
-function Scatterer(;
-    r::T,
+function Scatterer(
+    T::Type{<:Real} = Float64;
+    r::Real = 1.0,
     shape::Shape = SHAPE_SPHEROID,
-    axis_ratio::T,
+    axis_ratio::Real = 1.0,
     radius_type::RadiusType = RADIUS_EQUAL_VOLUME,
-    refractive_index::Complex{T} = 1.0,
+    refractive_index::Number = 1.0 + 0.0im,
     n::Int64 = 2,
     ngauss::Int64 = CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS,
-    λ::T = 1.0,
-) where {T<:Real}
+    λ::Real = 1.0,
+)
     if shape == SHAPE_CHEBYSHEV && (abs(axis_ratio) < 0.0 || abs(axis_ratio) >= 1.0)
         error("Constraint violated: Chebyshev particles should have 0≤|ε|<1.")
     end
+
+    r = T(r)
+    axis_ratio = T(axis_ratio)
+    refractive_index = Complex{T}(refractive_index)
+    λ = T(λ)
 
     if radius_type == RADIUS_EQUAL_VOLUME
         rev = r
@@ -210,7 +216,7 @@ function Scatterer(;
         elseif shape == SHAPE_CHEBYSHEV
             e = axis_ratio
             en = e * n
-            x, w = gausslegendre(ngauss)
+            x, w = gausslegendre(T, ngauss)
             s = 0.0
             v = 0.0
             @simd for i in 1:ngauss
@@ -238,7 +244,7 @@ function Scatterer(;
         elseif shape == SHAPE_CHEBYSHEV
             e = axis_ratio
             en = e * n
-            x, w = gausslegendre(ngauss)
+            x, w = gausslegendre(T, ngauss)
             θ = acos.(x)
             nθ = n * θ
             sinθ = sin.(θ)
@@ -251,6 +257,8 @@ function Scatterer(;
             rev = r / (1.0 + e) * rv
         end
     end
+
+    rev = T(rev)
 
     if shape == SHAPE_SPHEROID
         return Spheroid(rev, refractive_index, axis_ratio, λ, ScattererInfo(T))
@@ -269,6 +277,112 @@ end
 
 @doc raw"""
 ```
+tmatrix_routine_mishchenko(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64) where {T<:Real}
+```
+
+Generate the routine function which follows the iteration strategy used by M. Mishchenko.
+
+Parameters:
+
+- `scatterer`: The scatterer.
+- `ddelta`: The convergence threshold.
+- `ndgs`: Determines the initial value of `ngauss` as `ndgs * nmax`. The initial value of `nmax` is determined by the formula $\max(4, \lfloor kr + 4.05 * \sqrt[3]{kr}\rfloor)$.
+
+"""
+function tmatrix_routine_mishchenko(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64) where {T<:Real}
+    kr = 2 * T(π) * scatterer.rev / scatterer.λ
+    nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
+    ngstart = nstart * ndgs
+    Qsca0 = zero(T)
+    Qext0 = zero(T)
+    nmax_convergence = false
+
+    function routine(ngauss::Int64, nmax::Int64, Qsca::T, Qext::T)
+        ΔQsca = abs((Qsca0 - Qsca) / Qsca)
+        ΔQext = abs((Qext0 - Qext) / Qext)
+        Qsca0 = Qsca
+        Qext0 = Qext
+        Δ = max(ΔQsca, ΔQext)
+
+        if !nmax_convergence
+            @debug "[mishchenko] nmax iteration: nmax=$nmax ngauss=$ngauss ΔQsca=$ΔQsca ΔQext=$ΔQext"
+            if Δ < ddelta
+                @debug "[mishchenko] nmax convergence reached"
+                nmax_convergence = true
+                return ngauss + 2, nmax
+            else
+                return ngauss + ndgs, nmax + 1
+            end
+        else
+            @debug "[mishchenko] ngauss iteration: nmax=$nmax ngauss=$ngauss ΔQsca=$ΔQsca ΔQext=$ΔQext"
+            if Δ < ddelta
+                @debug "[mishchenko] ngauss convergence reached"
+                return -1, -1
+            else
+                return ngauss + 2, nmax
+            end
+        end
+    end
+
+    return ngstart, nstart, routine
+end
+
+@doc raw"""
+```
+tmatrix_routine_mishchenko_nmaxonly(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64) where {T<:Real}
+```
+
+Generate the routine function which generally follows the iteration strategy used by M. Mishchenko, but does not modify the value of `ngauss`.
+
+Parameters:
+
+- `scatterer`: The scatterer.
+- `ddelta`: The convergence threshold.
+- `ndgs`: Determines the initial value of `ngauss` as `ndgs * nmax`. The initial value of `nmax` is determined by the formula $\max(4, \lfloor kr + 4.05 * \sqrt[3]{kr}\rfloor)$.
+
+"""
+function tmatrix_routine_mishchenko_nmaxonly(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64) where {T<:Real}
+    kr = 2 * T(π) * scatterer.rev / scatterer.λ
+    nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
+    ngstart = nstart * ndgs
+    Qsca0 = zero(T)
+    Qext0 = zero(T)
+
+    function routine(ngauss::Int64, nmax::Int64, Qsca::T, Qext::T)
+        ΔQsca = abs((Qsca0 - Qsca) / Qsca)
+        ΔQext = abs((Qext0 - Qext) / Qext)
+        Qsca0 = Qsca
+        Qext0 = Qext
+        Δ = max(ΔQsca, ΔQext)
+
+        @debug "[nmax-only mishchenko] nmax iteration: nmax=$nmax ngauss=$ngauss ΔQsca=$ΔQsca ΔQext=$ΔQext"
+        if Δ < ddelta
+            @debug "[nmax-only mishchenko] nmax convergence reached"
+            return -1, -1
+        else
+            return ngauss, nmax + 1
+        end
+    end
+
+    return ngstart, nstart, routine
+end
+
+function calc_tmatrix!(scatterer::AbstractScatterer{T}) where {T<:Real}
+    return calc_tmatrix!(scatterer, T(1) / T(1000), 4)
+end
+
+function calc_tmatrix!(scatterer::AbstractScatterer{T}, t::Tuple{Int64,Int64,Function}) where {T<:Real}
+    ngauss, nmax, routine = t
+    return calc_tmatrix!(scatterer, ngauss, nmax, routine)
+end
+
+function calc_tmatrix!(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64) where {T<:Real}
+    ngauss, nmax, routine = tmatrix_routine_mishchenko(scatterer, ddelta, ndgs)
+    return calc_tmatrix!(scatterer, ngauss, nmax, routine)
+end
+
+@doc raw"""
+```
 calc_tmatrix(scatterer::Scatterer, accuracy::Float64=0.001)
 ```
 
@@ -277,79 +391,39 @@ Calculate the T-Matrix of the scatterer.
 Parameters:
 
 - `scatterer`: The scatterer.
-- `accuracy`: The intended threshold for convergence. Default is 0.001.
+- `ngstart`: The starting point of `ngauss`.
+- `nstart`: The starting point of `nmax`.
+- `routine`: The iteration routine function generated by a routine generator, internally or customly implemented.
 
 """
-function calc_tmatrix(scatterer::AbstractScatterer, accuracy::Float64 = 0.0001)
-    kr = 2π * scatterer.rev / scatterer.λ
-    nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
-    ngstart = nstart * 4
-    nmax = nstart
-    ngauss = ngstart
-    Δ = 1.0
-
-    Qext0 = 0.0
-    Qsca0 = 0.0
-    while Δ > accuracy
-        Qext = 0.0
-        Qsca = 0.0
-
+function calc_tmatrix!(
+    scatterer::AbstractScatterer{T},
+    ngstart::Int64,
+    nstart::Int64,
+    routine::Function,
+) where {T<:Real}
+    ngauss, nmax = ngstart, nstart
+    while true
+        Qext = zero(T)
+        Qsca = zero(T)
         T0, _ = tmatr0!(scatterer, ngauss, nmax)
         for n in 1:nmax
             Qsca += (2n + 1) * real(T0[n, n] * T0[n, n]' + T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]')
-            Qext += (2n + 1) * (real(T0[n, n] + real(T0[n + nmax, n + nmax])))
+            Qext += (2n + 1) * real(T0[n, n] + T0[n + nmax, n + nmax])
         end
-
-        ΔQsca = abs((Qsca0 - Qsca) / Qsca)
-        ΔQext = abs((Qext0 - Qext) / Qext)
-        Δ = max(ΔQsca, ΔQext)
-
-        @debug "nmax iteration" nmax ΔQsca ΔQext
-
-        if Δ <= accuracy
+        nngauss, nnmax = routine(ngauss, nmax, Qsca, Qext)
+        if nnmax == -1
             break
+        else
+            ngauss, nmax = nngauss, nnmax
         end
-
-        Qsca0 = Qsca
-        Qext0 = Qext
-        nmax += 1
-        ngauss += 4
     end
 
-    Δ = 1.0
-    Qext0 = 0.0
-    Qsca0 = 0.0
-    while Δ > accuracy
-        Qext = 0.0
-        Qsca = 0.0
-
-        T0, _ = tmatr0!(scatterer, ngauss, nmax)
-        for n in 1:nmax
-            Qsca += (2n + 1) * real(T0[n, n] * T0[n, n]' + T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]')
-            Qext += (2n + 1) * (real(T0[n, n]) + real(T0[n + nmax, n + nmax]))
-        end
-
-        ΔQsca = abs((Qsca0 - Qsca) / Qsca)
-        ΔQext = abs((Qext0 - Qext) / Qext)
-        Δ = max(ΔQsca, ΔQext)
-
-        @debug "ngauss iteration" ngauss ΔQsca ΔQext
-
-        Qsca0 = Qsca
-        Qext0 = Qext
-
-        if Δ <= accuracy
-            break
-        end
-
-        ngauss += 2
-    end
-
-    @debug "Convergence reached" nmax ngauss
-
+    @debug "Calculate T-Matrix for m = 0"
     T0, _ = tmatr0!(scatterer, ngauss, nmax)
     TT = [T0]
     for m in 1:nmax
+        @debug "Calculate T-Matrix for m = $m"
         Tm, _ = tmatr!(scatterer, m, ngauss, nmax)
         push!(TT, Tm)
     end
@@ -529,7 +603,7 @@ function calc_amplitude(
         end
     end
 
-    DK = 2π / scatterer.λ
+    DK = 2 * T(π) / scatterer.λ
     VV /= DK
     VH /= DK
     HV /= DK
@@ -594,13 +668,18 @@ function calc_SZ(
     return S, Z
 end
 
-function r_split!(scatterer::AbstractScatterer, ngauss::Int64, x::AbstractArray, w::AbstractArray)
+function theta_split!(
+    scatterer::AbstractScatterer{T},
+    ngauss::Int64,
+    x::AbstractArray{T},
+    w::AbstractArray{T},
+) where {T<:Real}
     if typeof(scatterer) <: Cylinder
         ng = ngauss ÷ 2
         ng1 = ng ÷ 2
         ng2 = ng - ng1
-        x1, w1 = gausslegendre(ng1)
-        x2, w2 = gausslegendre(ng2)
+        x1, w1 = gausslegendre(T, ng1)
+        x2, w2 = gausslegendre(T, ng2)
         xx = -cos(atan(scatterer.d_to_h))
         x[1:ng1] .= 0.5(xx + 1.0) .* x1 .+ 0.5(xx - 1.0)
         w[1:ng1] .= 0.5(xx + 1.0) .* w1
@@ -609,35 +688,35 @@ function r_split!(scatterer::AbstractScatterer, ngauss::Int64, x::AbstractArray,
         x[(ng + 1):ngauss] .= (-1.0) .* x[ng:-1:1]
         w[(ng + 1):ngauss] .= w[ng:-1:1]
     else
-        x0, w0 = gausslegendre(ngauss)
+        x0, w0 = gausslegendre(T, ngauss)
         x .= x0
         w .= w0
     end
 end
 
-function r_split(scatterer::AbstractScatterer, ngauss::Int64)
+function theta_split(scatterer::AbstractScatterer{T}, ngauss::Int64) where {T<:Real}
     x = zeros(ngauss)
     w = zeros(ngauss)
-    r_split!(scatterer, ngauss, x, w)
+    theta_split!(scatterer, ngauss, x, w)
     return x, w
 end
 
 @doc raw"""
 ```
-calc_r!(scatterer::Scatterer, ngauss::Int64, x::AbstractArray, w::AbstractArray, r::AbstractArray, dr::AbstractArray)
+calc_r!(scatterer::AbstractScatterer{T}, ngauss::Int64, x::AbstractArray{T}, w::AbstractArray{T}, r::AbstractArray{T}, dr::AbstractArray{T}) where {T<:Real}
 ```
 
 Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` points for a given scatterer.
 """
 function calc_r!(
-    scatterer::AbstractScatterer,
+    scatterer::AbstractScatterer{T},
     ngauss::Int64,
-    x::AbstractArray,
-    w::AbstractArray,
-    r::AbstractArray,
-    dr::AbstractArray,
-)
-    r_split!(scatterer, ngauss, x, w)
+    x::AbstractArray{T},
+    w::AbstractArray{T},
+    r::AbstractArray{T},
+    dr::AbstractArray{T},
+) where {T<:Real}
+    theta_split!(scatterer, ngauss, x, w)
     rev = scatterer.rev
 
     if typeof(scatterer) <: Cylinder
@@ -709,17 +788,16 @@ calc_r(scatterer::Scatterer, ngauss::Int64)
 
 Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` points for a given scatterer.
 """
-function calc_r(scatterer::AbstractScatterer, ngauss::Int64)
-    rev = scatterer.rev
-    x = zeros(ngauss)
-    w = zeros(ngauss)
-    r = zeros(ngauss)
-    dr = zeros(ngauss)
+function calc_r(scatterer::AbstractScatterer{T}, ngauss::Int64) where {T<:Real}
+    x = zeros(T, ngauss)
+    w = zeros(T, ngauss)
+    r = zeros(T, ngauss)
+    dr = zeros(T, ngauss)
     calc_r!(scatterer, ngauss, x, w, r, dr)
     return r, dr
 end
 
-function update!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
+function update!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where {T<:Real}
     info = scatterer.info
 
     # No need to recalculate if both `ngauss` and `nmax` remains the same.
@@ -727,19 +805,18 @@ function update!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
         return
     end
 
-    T = typeof(scatterer.rev)
+    ncap = info.ncap
+    ngcap = info.ngcap
 
     # Need to enlarge the arrays if either `ngauss` or `nmax` exceeds the current capacity.
     if ngauss > info.ngcap || nmax > info.ncap
-        ncap = info.ncap
-        ngcap = info.ngcap
         info.ncap = max(ncap, nmax * 2)
         info.ngcap = max(ngcap, ngauss * 2)
 
         if info.ncap > ncap
             info.an = [T(n * (n + 1)) for n in 1:(info.ncap)]
             info.ann = [
-                T(0.5 * √((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1)))) for n1 in 1:(info.ncap),
+                0.5 * √T((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1))) for n1 in 1:(info.ncap),
                 n2 in 1:(info.ncap)
             ]
             info.sig = [i % 2 == 1 ? T(-1.0) : T(1.0) for i in 1:(info.ncap)]
@@ -756,8 +833,8 @@ function update!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
         end
 
         if info.ncap > ncap
-            info.j_tmp = zeros(T, 2info.ncap)
-            info.j_s_tmp = zeros(Complex{T}, 2info.ncap)
+            info.j_tmp = zeros(T, 3info.ncap)
+            info.j_s_tmp = zeros(Complex{T}, 3info.ncap)
             info.J11 = zeros(Complex{T}, info.ncap, info.ncap)
             info.J12 = zeros(Complex{T}, info.ncap, info.ncap)
             info.J21 = zeros(Complex{T}, info.ncap, info.ncap)
@@ -786,7 +863,7 @@ function update!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     end
 
     # Need to recalculate `x`, `w`, `s`, `r`, `dr`, `kr1` and `kr_s1` only if `ngauss` changes.
-    k = 2π / scatterer.λ
+    k = 2 * T(π) / scatterer.λ
 
     if ngauss != info.ngauss
         calc_r!(
@@ -803,13 +880,14 @@ function update!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     end
 
     # The rest need to be recalculated when either `ngauss` or `nmax` changes.
-    rmax = maximum(info.r[1:ngauss])
+
     kr = k * info.r[1:ngauss]
     kr_s = scatterer.m * kr
+    rmax = maximum(info.r[1:ngauss])
     krmax = k * rmax
     tb = max(nmax, krmax * norm(scatterer.m))
-    nnmax1 = Int64(floor(1.2 * √(max(krmax, nmax)) + 3.0))
-    nnmax2 = Int64(floor(tb + 4.0 * ∛tb + 1.2 * √tb - nmax + 5))
+    nnmax1 = Int64(floor(8.0 * √(max(krmax, nmax)) + 3.0))
+    nnmax2 = Int64(floor(tb + 4.0 * ∛tb + 8.0 * √tb - nmax + 5))
 
     for i in 1:ngauss
         sphericalbesselj!(kr[i], nmax, nnmax1, view(info.jkr, i, :), view(info.djkr, i, :), info.j_tmp)
@@ -817,8 +895,8 @@ function update!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
         sphericalbesselj!(kr_s[i], nmax, nnmax2, view(info.jkr_s, i, :), view(info.djkr_s, i, :), info.j_s_tmp)
     end
 
-    info.hkr[1:ngauss, 1:nmax] = complex.(view(info.jkr, 1:ngauss, 1:nmax), view(info.ykr, 1:ngauss, 1:nmax))
-    info.dhkr[1:ngauss, 1:nmax] = complex.(view(info.djkr, 1:ngauss, 1:nmax), view(info.dykr, 1:ngauss, 1:nmax))
+    view(info.hkr, 1:ngauss, 1:nmax) .= complex.(view(info.jkr, 1:ngauss, 1:nmax), view(info.ykr, 1:ngauss, 1:nmax))
+    view(info.dhkr, 1:ngauss, 1:nmax) .= complex.(view(info.djkr, 1:ngauss, 1:nmax), view(info.dykr, 1:ngauss, 1:nmax))
 
     info.ngauss = ngauss
     info.nmax = nmax
@@ -826,25 +904,23 @@ function update!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     return
 end
 
-function constant(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
+function constant(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where {T<:Real}
     an = [Float64(n * (n + 1)) for n in 1:nmax]
     ann = [0.5 * √((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1))) for n1 in 1:nmax, n2 in 1:nmax]
 
     x = zeros(ngauss)
     w = zeros(ngauss)
-    r_split!(scatterer, ngauss, x, w)
+    theta_split!(scatterer, ngauss, x, w)
     s = 1 ./ (sin ∘ acos).(x)
     ss = s .^ 2
 
     return x, w, an, ann, s, ss
 end
 
-function vary(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
-    T = typeof(scatterer.rev)
-
+function vary(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where {T<:Real}
     r, dr = calc_r(scatterer, ngauss)
     λ = scatterer.λ
-    k = 2π / λ
+    k = 2 * T(π) / λ
     kr = k * r
     kr1 = 1.0 ./ kr
     kr_s = scatterer.m * kr
@@ -852,8 +928,8 @@ function vary(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     rmax = maximum(r)
     krmax = k * rmax
     tb = max(nmax, krmax * norm(scatterer.m))
-    nnmax1 = Int64(floor(1.2 * √(max(krmax, nmax)) + 3.0))
-    nnmax2 = Int64(floor(tb + 4.0 * ∛tb + 1.2 * √tb - nmax + 5))
+    nnmax1 = Int64(floor(8.0 * √(max(krmax, nmax)) + 3.0))
+    nnmax2 = Int64(floor(tb + 4.0 * ∛tb + 8.0 * √tb - nmax + 5))
 
     jkr = zeros(T, ngauss, nmax)
     djkr = zeros(T, ngauss, nmax)
@@ -861,8 +937,8 @@ function vary(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     dykr = zeros(T, ngauss, nmax)
     jkr_s = zeros(Complex{T}, ngauss, nmax)
     djkr_s = zeros(Complex{T}, ngauss, nmax)
-    j_tmp = zeros(T, 2nmax)
-    j_s_tmp = zeros(Complex{T}, 2nmax)
+    j_tmp = zeros(T, nmax + nnmax1)
+    j_s_tmp = zeros(Complex{T}, nmax + nnmax2)
 
     for i in 1:ngauss
         sphericalbesselj!(kr[i], nmax, nnmax1, view(jkr, i, :), view(djkr, i, :), j_tmp)
@@ -873,8 +949,7 @@ function vary(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     return r, dr, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s
 end
 
-function tmatr0!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
-    T = typeof(scatterer.rev)
+function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where {T<:Real}
     sym = has_symmetric_plane(scatterer)
     update!(scatterer, ngauss, nmax)
 
@@ -963,7 +1038,7 @@ function tmatr0!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     RgJ12 .*= -1.0im * ann
     RgJ21 .*= 1.0im * ann
 
-    k = 2π / scatterer.λ
+    k = 2 * T(π) / scatterer.λ
     k_s = k * scatterer.m
     kk = k^2
     kk_s = k * k_s
@@ -979,19 +1054,23 @@ function tmatr0!(scatterer::AbstractScatterer, ngauss::Int64, nmax::Int64)
     fill!(Q, zero(eltype(Q)))
     fill!(RgQ, zero(eltype(RgQ)))
 
-    Q11 .= kk_s * J21 + kk * J12
-    Q22 .= kk_s * J12 + kk * J21
+    Q11 .= kk_s * J21 .+ kk * J12
+    Q22 .= kk_s * J12 .+ kk * J21
 
-    RgQ11 .= kk_s * RgJ21 + kk * RgJ12
-    RgQ22 .= kk_s * RgJ12 + kk * RgJ21
+    RgQ11 .= kk_s * RgJ21 .+ kk * RgJ12
+    RgQ22 .= kk_s * RgJ12 .+ kk * RgJ21
 
     T0 = -RgQ * inv(Q)
+
+    if eltype(jkr) <: Arb
+        @debug "Accuracy of Q is $(minimum([Arblib.rel_accuracy_bits(real(x)) for x in Q]))"
+        @debug "Accuracy of T is $(minimum([Arblib.rel_accuracy_bits(real(x)) for x in T0]))"
+    end
 
     return T0, Q, RgQ
 end
 
-function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int64)
-    T = typeof(scatterer.rev)
+function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::Int64) where {T<:Real}
     sym = has_symmetric_plane(scatterer)
     update!(scatterer, ngauss, nmax)
 
@@ -1140,7 +1219,7 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
     RgJ21 .*= 1.0im * ann
     RgJ22 .*= -ann
 
-    k = 2π / scatterer.λ
+    k = 2 * T(π) / scatterer.λ
     k_s = k * scatterer.m
     kk = k^2
     kk_s = k * k_s
@@ -1161,17 +1240,22 @@ function tmatr!(scatterer::AbstractScatterer, m::Int64, ngauss::Int64, nmax::Int
 
     # Since T = -RgQ⋅Q', the coefficient -i of Q and RgQ can be cancelled out.
 
-    Q11 .= kk_s * J21 + kk * J12
-    Q12 .= kk_s * J11 + kk * J22
-    Q21 .= kk_s * J22 + kk * J11
-    Q22 .= kk_s * J12 + kk * J21
+    Q11 .= kk_s * J21 .+ kk * J12
+    Q12 .= kk_s * J11 .+ kk * J22
+    Q21 .= kk_s * J22 .+ kk * J11
+    Q22 .= kk_s * J12 .+ kk * J21
 
-    RgQ11 .= kk_s * RgJ21 + kk * RgJ12
-    RgQ12 .= kk_s * RgJ11 + kk * RgJ22
-    RgQ21 .= kk_s * RgJ22 + kk * RgJ11
-    RgQ22 .= kk_s * RgJ12 + kk * RgJ21
+    RgQ11 .= kk_s * RgJ21 .+ kk * RgJ12
+    RgQ12 .= kk_s * RgJ11 .+ kk * RgJ22
+    RgQ21 .= kk_s * RgJ22 .+ kk * RgJ11
+    RgQ22 .= kk_s * RgJ12 .+ kk * RgJ21
 
     Tm = -RgQ * inv(Q)
+
+    if eltype(jkr) <: Arb
+        @debug "Accuracy of Q is $(minimum([Arblib.rel_accuracy_bits(real(x)) for x in Q]))"
+        @debug "Accuracy of T is $(minimum([Arblib.rel_accuracy_bits(real(x)) for x in Tm]))"
+    end
 
     return Tm, Q, RgQ
 end

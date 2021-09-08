@@ -477,6 +477,7 @@ using Test
         rev = 1.0
         ratio = 1.0
         ddelta = 0.001
+        ndgs = 4
         ϑ_i = 56.0
         ϑ_s = 65.0
         φ_i = 114.0
@@ -495,11 +496,11 @@ using Test
                     λ = λ,
                 )
 
-                T = TMatrix.calc_tmatrix(scatterer, ddelta)
+                T = TMatrix.calc_tmatrix!(scatterer, ddelta, ndgs)
                 S, Z = TMatrix.calc_SZ(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, T)
 
                 np = -1
-                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, a_to_c, np, ddelta, 2)
+                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, a_to_c, np, ddelta, ndgs÷2)
                 S0, Z0 = TMatrix.Wrapper.calc_SZ(nmax, λ, α, β, ϑ_i, ϑ_s, φ_i, φ_s)
 
                 isapprox(T, T0, rtol = 1e-6) && isapprox(S, S0, rtol = 1e-6) && isapprox(Z, Z0, rtol = 1e-6)
@@ -517,11 +518,11 @@ using Test
                     λ = λ,
                 )
 
-                T = TMatrix.calc_tmatrix(scatterer, ddelta)
+                T = TMatrix.calc_tmatrix!(scatterer, ddelta, ndgs)
                 S, Z = TMatrix.calc_SZ(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, T)
 
                 np = -2
-                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, d_to_h, np, ddelta, 2)
+                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, d_to_h, np, ddelta, ndgs÷2)
                 S0, Z0 = TMatrix.Wrapper.calc_SZ(nmax, λ, α, β, ϑ_i, ϑ_s, φ_i, φ_s)
 
                 isapprox(T, T0, rtol = 1e-6) && isapprox(S, S0, rtol = 1e-6) && isapprox(Z, Z0, rtol = 1e-6)
@@ -542,11 +543,11 @@ using Test
                     λ = λ,
                 )
 
-                T = TMatrix.calc_tmatrix(scatterer, ddelta)
+                T = TMatrix.calc_tmatrix!(scatterer, ddelta, ndgs)
                 S, Z = TMatrix.calc_SZ(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, T)
 
                 np = ncheb
-                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, ε, np, ddelta, 2)
+                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, ε, np, ddelta, ndgs÷2)
                 S0, Z0 = TMatrix.Wrapper.calc_SZ(nmax, λ, α, β, ϑ_i, ϑ_s, φ_i, φ_s)
 
                 isapprox(T, T0, rtol = 1e-6) && isapprox(S, S0, rtol = 1e-6) && isapprox(Z, Z0, rtol = 1e-6)

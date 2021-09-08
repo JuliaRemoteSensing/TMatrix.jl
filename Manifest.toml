@@ -6,6 +6,18 @@ git-tree-sha1 = "84918055d15b3114ede17ac6a7182f68870c16f7"
 uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 version = "3.3.1"
 
+[[Arb_jll]]
+deps = ["Artifacts", "FLINT_jll", "GMP_jll", "JLLWrappers", "Libdl", "MPFR_jll", "Pkg"]
+git-tree-sha1 = "61452073a6b3d5a4105d6e7b3f9b7800fe5db150"
+uuid = "d9960996-1013-53c9-9ba4-74a4155039c3"
+version = "200.1900.1+0"
+
+[[Arblib]]
+deps = ["Arb_jll", "FLINT_jll", "LinearAlgebra", "Random", "SpecialFunctions", "Test"]
+git-tree-sha1 = "d19dfb96728844cf8a0da9cef2254010d3852765"
+uuid = "fb37089c-8514-4489-9461-98f9c8763369"
+version = "0.4.1"
+
 [[ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
 
@@ -53,11 +65,21 @@ version = "0.8.5"
 deps = ["ArgTools", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 
+[[FLINT_jll]]
+deps = ["Artifacts", "GMP_jll", "JLLWrappers", "Libdl", "MPFR_jll", "Pkg"]
+git-tree-sha1 = "a44041a4e8e592530952bbce5b68102bcbe7c3b4"
+uuid = "e134572f-a0d5-539d-bddf-3cad8db41a82"
+version = "200.700.100+0"
+
 [[FastGaussQuadrature]]
 deps = ["LinearAlgebra", "SpecialFunctions", "StaticArrays"]
 git-tree-sha1 = "5829b25887e53fb6730a9df2ff89ed24baa6abf6"
 uuid = "442a2c76-b920-505d-bb47-c5924d526838"
 version = "0.4.7"
+
+[[GMP_jll]]
+deps = ["Artifacts", "Libdl"]
+uuid = "781609d7-10c4-51f6-84f2-b8444358ff6d"
 
 [[InteractiveUtils]]
 deps = ["Markdown"]
@@ -105,6 +127,10 @@ version = "0.3.0"
 
 [[Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
+
+[[MPFR_jll]]
+deps = ["Artifacts", "GMP_jll", "Libdl"]
+uuid = "3a97d323-0669-5f0c-9066-3539efd106a3"
 
 [[Markdown]]
 deps = ["Base64"]

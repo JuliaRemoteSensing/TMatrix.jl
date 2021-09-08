@@ -11,29 +11,29 @@ function vig!(nmax::Int64, m::Int64, x::T, dv1::AbstractArray, dv2::AbstractArra
         error("Constraint violated: nmax >= 1")
     end
 
-    a = 1.0
-    qs = √(1.0 - x * x)
-    qs1 = 1.0 / qs
+    a = one(x)
+    qs = √(one(x) - x * x)
+    qs1 = one(x) / qs
     if m == 0
-        d1 = 1.0
+        d1 = one(x)
         d2 = x
         for i in 1:nmax
-            d3 = ((2i + 1) * x * d2 - i * d1) / (i + 1)
-            der = qs1 * (i * (i + 1) / (2i + 1)) * (d3 - d1)
+            d3 = (T(2i + 1) * x * d2 - i * d1) / (i + 1)
+            der = qs1 * T(i * (i + 1) / (2i + 1)) * (d3 - d1)
             dv1[i] = d2
             dv2[i] = der
             d1, d2 = d2, d3
         end
     else
         for i in 1:m
-            a *= √((2i - 1) / 2i) * qs
+            a *= √T((2i - 1) / 2i) * qs
         end
-        d1 = 0.0
+        d1 = zero(x)
         d2 = a
         for i in m:nmax
-            qnm = √(i^2 - m^2)
-            qnm1 = √((i + 1)^2 - m^2)
-            d3 = ((2i + 1) * x * d2 - qnm * d1) / qnm1
+            qnm = √T(i^2 - m^2)
+            qnm1 = √T((i + 1)^2 - m^2)
+            d3 = (T(2i + 1) * x * d2 - qnm * d1) / qnm1
             der = qs1 * (-(i + 1) * qnm * d1 + i * qnm1 * d3) / (2i + 1)
             dv1[i] = d2
             dv2[i] = der
@@ -55,10 +55,10 @@ function vigampl(nmax::Int64, m::Int64, x::T) where {T<:Real}
             return zeros(T, nmax), zeros(T, nmax)
         else
             if x < 0.0
-                dv1 = [(-1)^(i + 1) * 0.5 * √(i * (i + 1)) for i in 1:nmax]
+                dv1 = [(-1)^(i + 1) * T(0.5) * √T(i * (i + 1)) for i in 1:nmax]
                 dv2 = -dv1
             else
-                dv1 = [0.5 * √(i * (i + 1)) for i in 1:nmax]
+                dv1 = [T(0.5) * √T(i * (i + 1)) for i in 1:nmax]
                 dv2 = dv1
             end
 
@@ -67,19 +67,36 @@ function vigampl(nmax::Int64, m::Int64, x::T) where {T<:Real}
     end
 
     dv1, dv2 = vig(nmax, m, x)
-    dv1 /= √(1.0 - x^2)
+    dv1 /= √(one(x) - x^2)
 
     return dv1, dv2
 end
 
-function sphericalbesselj!(x::T, nmax::Int64, nnmax1::Int64, y::AbstractArray, u::AbstractArray, z::AbstractArray) where {T<:Number}
+@doc raw"""
+```
+sphericalbesselj!(x::T, nmax::Int64, nnmax1::Int64, y::AbstractArray{T}, u::AbstractArray{T}, z::AbstractArray{T}) where {T <: Number}
+```
+
+Calculate spherical Bessel function $j_n(x)$ and $\frac{1}{x}\frac{\mathrm{d}}{\mathrm{d}x}[xj_n(x)]$ in place.
+"""
+function sphericalbesselj!(
+    x::T,
+    nmax::Int64,
+    nnmax1::Int64,
+    y::AbstractArray{T},
+    u::AbstractArray{T},
+    z::AbstractArray{T},
+) where {T<:Number}
     l = nmax + nnmax1
-    x1 = 1.0 / x
+    x1 = one(x) / x
+    if length(z) < l
+        resize!(z, l)
+    end
     z[l] = x / (2l + 1)
     for i in (l - 1):-1:1
-        z[i] = 1.0 / ((2i + 1) * x1 - z[i + 1])
+        z[i] = one(x) / ((2i + 1) * x1 - z[i + 1])
     end
-    z0 = 1.0 / (x1 - z[1])
+    z0 = one(x) / (x1 - z[1])
     y0 = z0 * cos(x) * x1
     y[1] = y0 * z[1]
     u[1] = y0 - y[1] * x1
@@ -87,6 +104,43 @@ function sphericalbesselj!(x::T, nmax::Int64, nnmax1::Int64, y::AbstractArray, u
         y[i] = y[i - 1] * z[i]
         u[i] = y[i - 1] - y[i] * x1 * i
     end
+
+    return
+end
+
+@doc raw"""
+```
+sphericalbesselj!(x::T, nmax::Int64, nnmax1::Int64, y::AbstractArray{T}, u::AbstractArray{T}, z::AbstractArray{T}) where {T <: Union{Arb, Acb}}
+```
+
+For `Arb` and `Acb`, we use `Arblib.hypegeom_bessel_j!` instead.
+"""
+function sphericalbesselj!(
+    x::T,
+    nmax::Int64,
+    _nnmax1::Int64,
+    jkr::AbstractArray{T},
+    djkr::AbstractArray{T},
+    _z::AbstractArray{T},
+) where {T<:Union{Arb,Acb}}
+    x1 = 1 / x
+    y0 = zero(x)
+    half = Arb(1) / Arb(2)
+    coeff = √(Arb(π) / 2x)
+    Arblib.hypgeom_bessel_j!(y0, half, x)
+    for i in 1:nmax
+        Arblib.hypgeom_bessel_j!(jkr[i], Arb(i) + half, x)
+    end
+
+    djkr[1] = y0 - x1 * jkr[1]
+    for n in 2:nmax
+        djkr[n] = jkr[n - 1] - n * x1 * jkr[n]
+    end
+
+    jkr .*= coeff
+    djkr .*= coeff
+
+    return
 end
 
 function sphericalbesselj(x::T, nmax::Int64, nnmax1::Int64) where {T<:Number}
@@ -97,10 +151,10 @@ function sphericalbesselj(x::T, nmax::Int64, nnmax1::Int64) where {T<:Number}
     return y, u
 end
 
-function sphericalbessely!(x::T, nmax::Int64, y::AbstractArray, v::AbstractArray) where {T<:Real}
-    x1 = 1.0 / x
+function sphericalbessely!(x::T, nmax::Int64, y::AbstractArray{T}, v::AbstractArray{T}) where {T<:Number}
+    x1 = one(x) / x
     y[1] = -cos(x) * x1^2 - sin(x) * x1
-    y[2] = (-3.0 * x1^3 + x1) * cos(x) - 3.0x1^2 * sin(x)
+    y[2] = (-3x1^3 + x1) * cos(x) - 3x1^2 * sin(x)
     for i in 2:(nmax - 1)
         y[i + 1] = (2i + 1) * x1 * y[i] - y[i - 1]
     end
@@ -110,31 +164,57 @@ function sphericalbessely!(x::T, nmax::Int64, y::AbstractArray, v::AbstractArray
     end
 end
 
-function sphericalbessely(x::T, nmax::Int64) where {T<:Real}
+@doc raw"""
+```
+sphericalbessely!(x::T, nmax::Int64, y::AbstractArray{T}, u::AbstractArray{T}) where {T <: Union{Arb, Acb}}
+```
+
+For `Arb` and `Acb`, we use `Arblib.hypegeom_bessel_y!` instead.
+"""
+function sphericalbessely!(x::T, nmax::Int64, ykr::AbstractArray{T}, dykr::AbstractArray{T}) where {T<:Union{Arb,Acb}}
+    x1 = 1 / x
+    y0 = zero(x)
+    half = Arb(1) / Arb(2)
+    coeff = √(Arb(π) / 2x)
+    Arblib.hypgeom_bessel_y!(y0, half, x)
+    for i in 1:nmax
+        Arblib.hypgeom_bessel_y!(ykr[i], Arb(i) + half, x)
+    end
+
+    dykr[1] = y0 - x1 * ykr[1]
+    for n in 2:nmax
+        dykr[n] = ykr[n - 1] - n * x1 * ykr[n]
+    end
+
+    ykr .*= coeff
+    return dykr .*= coeff
+end
+
+function sphericalbessely(x::T, nmax::Int64) where {T<:Number}
     y = zeros(T, nmax)
     v = zeros(T, nmax)
     sphericalbessely!(x, nmax, y, v)
     return y, v
 end
 
-function cross_section(T::Vector{Matrix{Complex{P}}}, λ::P) where {P<:Real}
-    nmax = length(T) - 1
+function cross_section(TT::Vector{Matrix{Complex{T}}}, λ::T) where {T<:Real}
+    nmax = length(TT) - 1
 
-    Qsca = 0.0
-    Qext = 0.0
+    Qsca = zero(λ)
+    Qext = zero(λ)
     for n2 in 1:nmax
         nn2 = n2 + nmax
         for n1 in 1:nmax
             nn1 = n1 + nmax
             Qsca +=
-                T[1][n1, n2] * T[1][n1, n2]' +
-                T[1][n1, nn2] * T[1][n1, nn2]' +
-                T[1][nn1, n2] * T[1][nn1, n2]' +
-                T[1][nn1, nn2] * T[1][nn1, nn2]'
+                TT[1][n1, n2] * TT[1][n1, n2]' +
+                TT[1][n1, nn2] * TT[1][n1, nn2]' +
+                TT[1][nn1, n2] * TT[1][nn1, n2]' +
+                TT[1][nn1, nn2] * TT[1][nn1, nn2]'
         end
     end
     for n in 1:(2nmax)
-        Qext += real(T[1][n, n])
+        Qext += real(TT[1][n, n])
     end
 
     for mm in 1:nmax
@@ -145,16 +225,16 @@ function cross_section(T::Vector{Matrix{Complex{P}}}, λ::P) where {P<:Real}
                 nn1 = n1 + nm
                 Qsca +=
                     (
-                        T[mm + 1][n1, n2] * T[mm + 1][n1, n2]' +
-                        T[mm + 1][n1, nn2] * T[mm + 1][n1, nn2]' +
-                        T[mm + 1][nn1, n2] * T[mm + 1][nn1, n2]' +
-                        T[mm + 1][nn1, nn2] * T[mm + 1][nn1, nn2]'
+                        TT[mm + 1][n1, n2] * TT[mm + 1][n1, n2]' +
+                        TT[mm + 1][n1, nn2] * TT[mm + 1][n1, nn2]' +
+                        TT[mm + 1][nn1, n2] * TT[mm + 1][nn1, n2]' +
+                        TT[mm + 1][nn1, nn2] * TT[mm + 1][nn1, nn2]'
                     ) * 2.0
             end
         end
 
         for n in 1:(2nm)
-            Qext += real(T[mm + 1][n, n]) * 2.0
+            Qext += real(TT[mm + 1][n, n]) * 2.0
         end
     end
 
@@ -168,4 +248,25 @@ function cross_section(T::Vector{Matrix{Complex{P}}}, λ::P) where {P<:Real}
     end
 
     return Csca, Cext, ω
+end
+
+gausslegendre(::Type{Float64}, n::Integer) = FastGaussQuadrature.gausslegendre(n)
+
+function gausslegendre(T::Type{<:Real}, n::Integer)
+    prec = precision(T)
+    x = [Arb(0, prec = prec) for _ in 1:n]
+    w = [Arb(0, prec = prec) for _ in 1:n]
+    for i in 1:(n ÷ 2)
+        Arblib.hypgeom_legendre_p_ui_root!(x[i], w[i], UInt64(n), UInt64(i - 1), prec = prec)
+    end
+    for i in (n - n ÷ 2 + 1):n
+        x[i] = -x[n + 1 - i]
+        w[i] = w[n + 1 - i]
+    end
+
+    if T == Arb
+        return x, w
+    else
+        return [T(x[i]) for i in 1:n], [T(w[i]) for i in 1:n]
+    end
 end
