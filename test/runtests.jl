@@ -2,6 +2,9 @@ using TMatrix
 using TMatrix.Wrapper
 using Test
 
+const RTOL = 1e-6
+const ATOL = 1e-6
+
 @testset "TMatrix.jl" begin
     @testset "Calculate vig function" begin
         @testset "vig($nmax, $m, $x)" for (nmax, m, x) in [
@@ -10,7 +13,7 @@ using Test
             @test begin
                 dv10, dv20 = TMatrix.Wrapper.vig(nmax, m, x)
                 dv1, dv2 = TMatrix.vig(nmax, m, x)
-                dv1 ≈ dv10 && dv2 ≈ dv20
+                all(dv1 .≈ dv10) && all(dv2 .≈ dv20)
             end
         end
     end
@@ -22,7 +25,7 @@ using Test
             @test begin
                 dv10, dv20 = TMatrix.Wrapper.vigampl(nmax, m, x)
                 dv1, dv2 = TMatrix.vigampl(nmax, m, x)
-                dv1 ≈ dv10 && dv2 ≈ dv20
+                all(dv1 .≈ dv10) && all(dv2 .≈ dv20)
             end
         end
     end
@@ -47,7 +50,7 @@ using Test
                 r2, drr = TMatrix.Wrapper.rsp1(ngauss, rev, a_to_c)
                 r, dr = TMatrix.calc_r(scatterer, ngauss)
 
-                r .^ 2 ≈ r2 && dr ./ r ≈ drr
+                all(r .^ 2 .≈ r2) && all(dr ./ r .≈ drr)
             end
         end
 
@@ -70,7 +73,7 @@ using Test
                 r2, drr = TMatrix.Wrapper.rsp3(ngauss, rev, d_to_h)
                 r, dr = TMatrix.calc_r(scatterer, ngauss)
 
-                r .^ 2 ≈ r2 && dr ./ r ≈ drr
+                all(r .^ 2 .≈ r2) && all(dr ./ r .≈ drr)
             end
         end
 
@@ -95,7 +98,7 @@ using Test
                 r2, drr = TMatrix.Wrapper.rsp2(ngauss, rev, ε, ncheb)
                 r, dr = TMatrix.calc_r(scatterer, ngauss)
 
-                r .^ 2 ≈ r2 && dr ./ r ≈ drr
+                all(r .^ 2 .≈ r2) && all(dr ./ r .≈ drr)
             end
         end
     end
@@ -176,7 +179,7 @@ using Test
                 s0 = s0[1:ngauss]
                 ss0 = ss0[1:ngauss]
                 x, w, an, ann, s, ss = TMatrix.constant(scatterer, ngauss, nmax)
-                x ≈ x0 && w ≈ w0 && an ≈ an0 && ann ≈ ann0 && s ≈ s0 && ss ≈ ss0
+                all(x .≈ x0) && all(w .≈ w0) && all(an .≈ an0) && all(ann .≈ ann0) && all(s .≈ s0) && all(ss .≈ ss0)
             end
         end
 
@@ -201,7 +204,7 @@ using Test
                 s0 = s0[1:ngauss]
                 ss0 = ss0[1:ngauss]
                 x, w, an, ann, s, ss = TMatrix.constant(scatterer, ngauss, nmax)
-                x ≈ x0 && w ≈ w0 && an ≈ an0 && ann ≈ ann0 && s ≈ s0 && ss ≈ ss0
+                all(x .≈ x0) && all(w .≈ w0) && all(an .≈ an0) && all(ann .≈ ann0) && all(s .≈ s0) && all(ss .≈ ss0)
             end
         end
 
@@ -227,7 +230,7 @@ using Test
                 s0 = s0[1:ngauss]
                 ss0 = ss0[1:ngauss]
                 x, w, an, ann, s, ss = TMatrix.constant(scatterer, ngauss, nmax)
-                x ≈ x0 && w ≈ w0 && an ≈ an0 && ann ≈ ann0 && s ≈ s0 && ss ≈ ss0
+                all(x .≈ x0) && all(w .≈ w0) && all(an .≈ an0) && all(ann .≈ ann0) && all(s .≈ s0) && all(ss .≈ ss0)
             end
         end
     end
@@ -240,7 +243,7 @@ using Test
             @test begin
                 y0, u0 = TMatrix.Wrapper.rjb(x, nmax, nnmax)
                 y, u = TMatrix.sphericalbesselj(x, nmax, nnmax)
-                y ≈ y0 && u ≈ u0
+                all(y .≈ y0) && all(u .≈ u0)
             end
         end
 
@@ -258,7 +261,7 @@ using Test
             @test begin
                 y0, u0 = TMatrix.Wrapper.cjb(x, nmax, nnmax)
                 y, u = TMatrix.sphericalbesselj(x, nmax, nnmax)
-                y ≈ y0 && u ≈ u0
+                all(y .≈ y0) && all(u .≈ u0)
             end
         end
 
@@ -267,7 +270,7 @@ using Test
             @test begin
                 y0, u0 = TMatrix.Wrapper.ryb(x, nmax)
                 y, u = TMatrix.sphericalbessely(x, nmax)
-                y ≈ y0 && u ≈ u0
+                all(y .≈ y0) && all(u .≈ u0)
             end
         end
     end
@@ -296,14 +299,14 @@ using Test
                     TMatrix.Wrapper.vary(x, λ, m, rev, a_to_c, np, ngauss, nmax)
                 _, _, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
 
-                ddr[1:ngauss] ≈ kr1 &&
-                    (drr + 1.0im * dri)[1:ngauss] ≈ kr_s1 &&
-                    jkr0 ≈ jkr &&
-                    djkr0 ≈ djkr &&
-                    ykr0 ≈ ykr &&
-                    dykr0 ≈ dykr &&
-                    jkr_s0 ≈ jkr_s &&
-                    djkr_s0 ≈ djkr_s
+                all(ddr[1:ngauss] .≈ kr1) &&
+                    all((drr + 1.0im * dri)[1:ngauss] .≈ kr_s1) &&
+                    all(jkr0 .≈ jkr) &&
+                    all(djkr0 .≈ djkr) &&
+                    all(ykr0 .≈ ykr) &&
+                    all(dykr0 .≈ dykr) &&
+                    all(jkr_s0 .≈ jkr_s) &&
+                    all(djkr_s0 .≈ djkr_s)
             end
         end
 
@@ -324,14 +327,14 @@ using Test
                     TMatrix.Wrapper.vary(x, λ, m, rev, d_to_h, np, ngauss, nmax)
                 _, _, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
 
-                ddr[1:ngauss] ≈ kr1 &&
-                    (drr + 1.0im * dri)[1:ngauss] ≈ kr_s1 &&
-                    jkr0 ≈ jkr &&
-                    djkr0 ≈ djkr &&
-                    ykr0 ≈ ykr &&
-                    dykr0 ≈ dykr &&
-                    jkr_s0 ≈ jkr_s &&
-                    djkr_s0 ≈ djkr_s
+                all(ddr[1:ngauss] .≈ kr1) &&
+                    all((drr + 1.0im * dri)[1:ngauss] .≈ kr_s1) &&
+                    all(jkr0 .≈ jkr) &&
+                    all(djkr0 .≈ djkr) &&
+                    all(ykr0 .≈ ykr) &&
+                    all(dykr0 .≈ dykr) &&
+                    all(jkr_s0 .≈ jkr_s) &&
+                    all(djkr_s0 .≈ djkr_s)
             end
         end
 
@@ -355,14 +358,14 @@ using Test
                     TMatrix.Wrapper.vary(x, λ, m, rev, ε, np, ngauss, nmax)
                 _, _, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
 
-                ddr[1:ngauss] ≈ kr1 &&
-                    (drr + 1.0im * dri)[1:ngauss] ≈ kr_s1 &&
-                    jkr0 ≈ jkr &&
-                    djkr0 ≈ djkr &&
-                    ykr0 ≈ ykr &&
-                    dykr0 ≈ dykr &&
-                    jkr_s0 ≈ jkr_s &&
-                    djkr_s0 ≈ djkr_s
+                all(ddr[1:ngauss] .≈ kr1) &&
+                    all((drr + 1.0im * dri)[1:ngauss] .≈ kr_s1) &&
+                    all(jkr0 .≈ jkr) &&
+                    all(djkr0 .≈ djkr) &&
+                    all(ykr0 .≈ ykr) &&
+                    all(dykr0 .≈ dykr) &&
+                    all(jkr_s0 .≈ jkr_s) &&
+                    all(djkr_s0 .≈ djkr_s)
             end
         end
     end
@@ -374,7 +377,7 @@ using Test
         nmax = 20
         ngauss = nmax * 4
 
-        @testset "for spheroids with a_to_c = $a_to_c" for a_to_c in [0.5, 1.0, 2.0]
+        @testset "for spheroids with a_to_c = $a_to_c" for a_to_c in [0.5, 1.01, 2.0]
             @test begin
                 scatterer = TMatrix.Scatterer(
                     r = rev,
@@ -395,7 +398,7 @@ using Test
                         T0, _ = TMatrix.Wrapper.tmatr(mm, ngauss, nmax, np, a_to_c, λ, m, rev)
                         T, _ = TMatrix.tmatr!(scatterer, mm, ngauss, nmax)
                     end
-                    if !(T ≈ T0)
+                    if !all(isapprox.(T0, T, rtol = RTOL, atol = ATOL))
                         valid = false
                         break
                     end
@@ -426,7 +429,7 @@ using Test
                         T0, _ = TMatrix.Wrapper.tmatr(mm, ngauss, nmax, np, d_to_h, λ, m, rev)
                         T, _ = TMatrix.tmatr!(scatterer, mm, ngauss, nmax)
                     end
-                    if !(T ≈ T0)
+                    if !all(isapprox.(T0, T, rtol = RTOL, atol = ATOL))
                         valid = false
                         break
                     end
@@ -437,7 +440,7 @@ using Test
         end
 
         @testset "for Chebyshev particles with ε = $ε and ncheb = $ncheb" for (ε, ncheb) in [
-            (ε, ncheb) for ε in [0.0, 0.1, 0.5], ncheb in [2, 3, 4, 10]
+            (ε, ncheb) for ε in [-0.15, 0.01, 0.1], ncheb in [2, 3, 4, 10]
         ]
             @test begin
                 scatterer = TMatrix.Scatterer(
@@ -460,7 +463,7 @@ using Test
                         T0, _ = TMatrix.Wrapper.tmatr(mm, ngauss, nmax, np, ε, λ, m, rev)
                         T, _ = TMatrix.tmatr!(scatterer, mm, ngauss, nmax)
                     end
-                    if !(T ≈ T0)
+                    if !all(isapprox.(T0, T, rtol = RTOL, atol = ATOL))
                         valid = false
                         break
                     end
@@ -485,7 +488,7 @@ using Test
         α = 145.0
         β = 52.0
 
-        @testset "for spheroids with a_to_c = $a_to_c" for a_to_c in [0.5, 1.0, 2.0]
+        @testset "for spheroids with a_to_c = $a_to_c" for a_to_c in [0.5, 1.01, 2.0]
             @test begin
                 scatterer = TMatrix.Scatterer(
                     r = rev,
@@ -500,10 +503,12 @@ using Test
                 S, Z = TMatrix.calc_SZ(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, T)
 
                 np = -1
-                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, a_to_c, np, ddelta, ndgs÷2)
+                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, a_to_c, np, ddelta, ndgs ÷ 2)
                 S0, Z0 = TMatrix.Wrapper.calc_SZ(nmax, λ, α, β, ϑ_i, ϑ_s, φ_i, φ_s)
 
-                isapprox(T, T0, rtol = 1e-6) && isapprox(S, S0, rtol = 1e-6) && isapprox(Z, Z0, rtol = 1e-6)
+                all(isapprox.(T, T0, rtol = RTOL, atol = ATOL)) &&
+                    all(isapprox.(S, S0, rtol = RTOL, atol = ATOL)) &&
+                    all(isapprox.(Z, Z0, rtol = RTOL, atol = ATOL))
             end
         end
 
@@ -522,10 +527,12 @@ using Test
                 S, Z = TMatrix.calc_SZ(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, T)
 
                 np = -2
-                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, d_to_h, np, ddelta, ndgs÷2)
+                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, d_to_h, np, ddelta, ndgs ÷ 2)
                 S0, Z0 = TMatrix.Wrapper.calc_SZ(nmax, λ, α, β, ϑ_i, ϑ_s, φ_i, φ_s)
 
-                isapprox(T, T0, rtol = 1e-6) && isapprox(S, S0, rtol = 1e-6) && isapprox(Z, Z0, rtol = 1e-6)
+                all(isapprox.(T, T0, rtol = RTOL, atol = ATOL)) &&
+                    all(isapprox.(S, S0, rtol = RTOL, atol = ATOL)) &&
+                    all(isapprox.(Z, Z0, rtol = RTOL, atol = ATOL))
             end
         end
 
@@ -547,10 +554,12 @@ using Test
                 S, Z = TMatrix.calc_SZ(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, T)
 
                 np = ncheb
-                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, ε, np, ddelta, ndgs÷2)
+                T0, nmax = TMatrix.Wrapper.calc_tmatrix(rev, ratio, λ, m, ε, np, ddelta, ndgs ÷ 2)
                 S0, Z0 = TMatrix.Wrapper.calc_SZ(nmax, λ, α, β, ϑ_i, ϑ_s, φ_i, φ_s)
 
-                isapprox(T, T0, rtol = 1e-6) && isapprox(S, S0, rtol = 1e-6) && isapprox(Z, Z0, rtol = 1e-6)
+                all(isapprox.(T, T0, rtol = RTOL, atol = ATOL)) &&
+                    all(isapprox.(S, S0, rtol = RTOL, atol = ATOL)) &&
+                    all(isapprox.(Z, Z0, rtol = RTOL, atol = ATOL))
             end
         end
     end
