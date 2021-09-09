@@ -992,7 +992,7 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) wh
     fill!(RgJ12, 0.0)
     fill!(RgJ21, 0.0)
 
-    for n2 in 1:nmax
+    Threads.@threads for n2 in 1:nmax
         for n1 in 1:nmax
             for i in 1:ngss
                 if !(sym && (n1 + n2) % 2 == 1)
@@ -1136,7 +1136,7 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
     OffsetRgJ21 = OffsetArray(RgJ21, mm:nmax, mm:nmax)
     OffsetRgJ22 = OffsetArray(RgJ22, mm:nmax, mm:nmax)
 
-    for n2 in mm:nmax
+    Threads.@threads for n2 in mm:nmax
         for n1 in mm:nmax
             for i in 1:ngss
                 if !(sym && (n1 + n2) % 2 == 0)
