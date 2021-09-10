@@ -110,26 +110,24 @@ end
 
 @doc raw"""
 ```
-sphericalbesselj!(x::T, nmax::Int64, nnmax1::Int64, y::AbstractArray{T}, u::AbstractArray{T}, z::AbstractArray{T}) where {T <: Union{Arb, Acb}}
+sphericalbesselj!(x::T, nmax::Int64, y::AbstractArray{T}, u::AbstractArray{T}) where {T <: Union{Arb, Acb}}
 ```
 
-For `Arb` and `Acb`, we use `Arblib.hypegeom_bessel_j!` instead.
+For `Arb` and `Acb`, use `Arblib.hypegeom_bessel_j!` instead.
 """
 function sphericalbesselj!(
     x::T,
     nmax::Int64,
-    _nnmax1::Int64,
     jkr::AbstractArray{T},
     djkr::AbstractArray{T},
-    _z::AbstractArray{T},
 ) where {T<:Union{Arb,Acb}}
     x1 = 1 / x
     y0 = zero(x)
-    half = Arb(1) / Arb(2)
-    coeff = √(Arb(π) / 2x)
+    half = T(1//2)
+    coeff = √(T(π) / 2x)
     Arblib.hypgeom_bessel_j!(y0, half, x)
     for i in 1:nmax
-        Arblib.hypgeom_bessel_j!(jkr[i], Arb(i) + half, x)
+        jkr[i] = Arblib.hypgeom_bessel_j!(jkr[i], T(i) + half, x)
     end
 
     djkr[1] = y0 - x1 * jkr[1]
@@ -169,16 +167,16 @@ end
 sphericalbessely!(x::T, nmax::Int64, y::AbstractArray{T}, u::AbstractArray{T}) where {T <: Union{Arb, Acb}}
 ```
 
-For `Arb` and `Acb`, we use `Arblib.hypegeom_bessel_y!` instead.
+For `Arb` and `Acb`, use `Arblib.hypegeom_bessel_y!` instead.
 """
 function sphericalbessely!(x::T, nmax::Int64, ykr::AbstractArray{T}, dykr::AbstractArray{T}) where {T<:Union{Arb,Acb}}
     x1 = 1 / x
     y0 = zero(x)
-    half = Arb(1) / Arb(2)
-    coeff = √(Arb(π) / 2x)
+    half = T(1//2)
+    coeff = √(T(π) / 2x)
     Arblib.hypgeom_bessel_y!(y0, half, x)
     for i in 1:nmax
-        Arblib.hypgeom_bessel_y!(ykr[i], Arb(i) + half, x)
+        ykr[i] = Arblib.hypgeom_bessel_y!(ykr[i], T(i) + half, x)
     end
 
     dykr[1] = y0 - x1 * ykr[1]
@@ -187,7 +185,9 @@ function sphericalbessely!(x::T, nmax::Int64, ykr::AbstractArray{T}, dykr::Abstr
     end
 
     ykr .*= coeff
-    return dykr .*= coeff
+    dykr .*= coeff
+
+    return
 end
 
 function sphericalbessely(x::T, nmax::Int64) where {T<:Number}
@@ -197,7 +197,7 @@ function sphericalbessely(x::T, nmax::Int64) where {T<:Number}
     return y, v
 end
 
-function cross_section(TT::Vector{Matrix{Complex{T}}}, λ::T) where {T<:Real}
+function cross_section(TT::Vector{<:AbstractMatrix{CT}}, λ::T) where {T<:Real, CT<:Number}
     nmax = length(TT) - 1
 
     Qsca = zero(λ)
@@ -254,19 +254,28 @@ gausslegendre(::Type{Float64}, n::Integer) = FastGaussQuadrature.gausslegendre(n
 
 function gausslegendre(T::Type{<:Real}, n::Integer)
     prec = precision(T)
-    x = [Arb(0, prec = prec) for _ in 1:n]
-    w = [Arb(0, prec = prec) for _ in 1:n]
+    x = ArbVector(n, prec = prec)
+    w = ArbVector(n, prec = prec)
     for i in 1:(n ÷ 2)
-        Arblib.hypgeom_legendre_p_ui_root!(x[i], w[i], UInt64(n), UInt64(i - 1), prec = prec)
+        Arblib.hypgeom_legendre_p_ui_root!(ref(x, i), ref(w, i), UInt64(n), UInt64(i - 1), prec = prec)
     end
     for i in (n - n ÷ 2 + 1):n
-        x[i] = -x[n + 1 - i]
-        w[i] = w[n + 1 - i]
+        x[i] = -ref(x, n + 1 - i)
+        w[i] = ref(w, n + 1 - i)
     end
 
-    if T == Arb
-        return x, w
-    else
-        return [T(x[i]) for i in 1:n], [T(w[i]) for i in 1:n]
+    return [T(ref(x, i)) for i in 1:n], [T(ref(w, i)) for i in 1:n]
+end
+
+function gausslegendre(::Type{<:Union{Arb, ArbRef}}, n::Integer)
+    x = ArbVector(n)
+    w = ArbVector(n)
+    for i in 1:(n ÷ 2)
+        Arblib.hypgeom_legendre_p_ui_root!(ref(x, i), ref(w, i), UInt64(n), UInt64(i - 1))
     end
+    for i in (n - n ÷ 2 + 1):n
+        x[i] = -ref(x, n + 1 - i)
+        w[i] = ref(w, n + 1 - i)
+    end
+    return x, w
 end
