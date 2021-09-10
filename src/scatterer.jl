@@ -1,9 +1,10 @@
 @enum Shape SHAPE_SPHEROID SHAPE_CYLINDER SHAPE_CHEBYSHEV
 @enum RadiusType RADIUS_EQUAL_VOLUME RADIUS_EQUAL_AREA RADIUS_MAXIMUM
 
-const DEFAULT_NCAP = 100
-const DEFAULT_NGCAP = 500
-const CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS = 60
+const DEFAULT_NCAP = Ref{Int64}(100)
+const DEFAULT_NGCAP = Ref{Int64}(500)
+const CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS = Ref{Int64}(60)
+const ARB_APPROX_MATRIX_INV = Ref{Bool}(false)
 
 @doc raw"""
 Accompanied information of a scatterer.
@@ -99,44 +100,44 @@ function ScattererInfo(T)
            ScattererInfo(
         0,
         0,
-        DEFAULT_NCAP,
-        DEFAULT_NGCAP,
-        [T(n * (n + 1)) for n in 1:DEFAULT_NCAP],
+        DEFAULT_NCAP[],
+        DEFAULT_NGCAP[],
+        [T(n * (n + 1)) for n in 1:DEFAULT_NCAP[]],
         [
-            T(0.5 * √((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1)))) for n1 in 1:DEFAULT_NCAP,
-            n2 in 1:DEFAULT_NCAP
+            T(0.5 * √((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1)))) for n1 in 1:DEFAULT_NCAP[],
+            n2 in 1:DEFAULT_NCAP[]
         ],
-        [i % 2 == 1 ? T(-1.0) : T(1.0) for i in 1:DEFAULT_NCAP],
-        zeros(T, DEFAULT_NGCAP),
-        zeros(T, DEFAULT_NGCAP),
-        zeros(T, DEFAULT_NGCAP),
-        zeros(T, DEFAULT_NGCAP),
-        zeros(T, DEFAULT_NGCAP),
-        zeros(T, DEFAULT_NGCAP),
-        zeros(Complex{T}, DEFAULT_NGCAP),
-        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
-        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
-        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
-        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
-        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
+        [i % 2 == 1 ? T(-1.0) : T(1.0) for i in 1:DEFAULT_NCAP[]],
+        zeros(T, DEFAULT_NGCAP[]),
+        zeros(T, DEFAULT_NGCAP[]),
+        zeros(T, DEFAULT_NGCAP[]),
+        zeros(T, DEFAULT_NGCAP[]),
+        zeros(T, DEFAULT_NGCAP[]),
+        zeros(T, DEFAULT_NGCAP[]),
+        zeros(Complex{T}, DEFAULT_NGCAP[]),
+        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
         zeros(T, 0),
-        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
-        zeros(T, DEFAULT_NGCAP, DEFAULT_NCAP),
-        zeros(Complex{T}, DEFAULT_NGCAP, DEFAULT_NCAP),
-        zeros(Complex{T}, DEFAULT_NGCAP, DEFAULT_NCAP),
-        zeros(Complex{T}, DEFAULT_NGCAP, DEFAULT_NCAP),
-        zeros(Complex{T}, DEFAULT_NGCAP, DEFAULT_NCAP),
+        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+        zeros(Complex{T}, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+        zeros(Complex{T}, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+        zeros(Complex{T}, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+        zeros(Complex{T}, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
         zeros(Complex{T}, 0),
-        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
-        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
-        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
-        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
-        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
-        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
-        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
-        zeros(Complex{T}, DEFAULT_NCAP, DEFAULT_NCAP),
-        zeros(Complex{T}, 2DEFAULT_NCAP, 2DEFAULT_NCAP),
-        zeros(Complex{T}, 2DEFAULT_NCAP, 2DEFAULT_NCAP),
+        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+        zeros(Complex{T}, 2DEFAULT_NCAP[], 2DEFAULT_NCAP[]),
+        zeros(Complex{T}, 2DEFAULT_NCAP[], 2DEFAULT_NCAP[]),
     )
 end
 
@@ -228,7 +229,7 @@ function Scatterer(
     radius_type::RadiusType = RADIUS_EQUAL_VOLUME,
     refractive_index::Number = 1.0 + 0.0im,
     n::Int64 = 2,
-    ngauss::Int64 = CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS,
+    ngauss::Int64 = CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS[],
     λ::Real = 1.0,
 )
     if shape == SHAPE_CHEBYSHEV && (abs(axis_ratio) < 0.0 || abs(axis_ratio) >= 1.0)
@@ -411,27 +412,18 @@ function tmatrix_routine_mishchenko_nmaxonly(scatterer::AbstractScatterer{T}, dd
     return ngstart, nstart, routine
 end
 
-function calc_tmatrix!(scatterer::AbstractScatterer{T}; approx_matrix_inv::Bool = false) where {T<:Real}
-    return calc_tmatrix!(scatterer, T(1) / T(1000), 4, approx_matrix_inv = approx_matrix_inv)
+function calc_tmatrix!(scatterer::AbstractScatterer{T}) where {T<:Real}
+    return calc_tmatrix!(scatterer, T(1) / T(1000), 4)
 end
 
-function calc_tmatrix!(
-    scatterer::AbstractScatterer{T},
-    t::Tuple{Int64,Int64,Function};
-    approx_matrix_inv::Bool = false,
-) where {T<:Real}
+function calc_tmatrix!(scatterer::AbstractScatterer{T}, t::Tuple{Int64,Int64,Function};) where {T<:Real}
     ngauss, nmax, routine = t
-    return calc_tmatrix!(scatterer, ngauss, nmax, routine, approx_matrix_inv = approx_matrix_inv)
+    return calc_tmatrix!(scatterer, ngauss, nmax, routine)
 end
 
-function calc_tmatrix!(
-    scatterer::AbstractScatterer{T},
-    ddelta::T,
-    ndgs::Int64;
-    approx_matrix_inv::Bool = false,
-) where {T<:Real}
+function calc_tmatrix!(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64;) where {T<:Real}
     ngauss, nmax, routine = tmatrix_routine_mishchenko(scatterer, ddelta, ndgs)
-    return calc_tmatrix!(scatterer, ngauss, nmax, routine, approx_matrix_inv = approx_matrix_inv)
+    return calc_tmatrix!(scatterer, ngauss, nmax, routine)
 end
 
 @doc raw"""
@@ -441,24 +433,19 @@ calc_tmatrix(scatterer::Scatterer, accuracy::Float64=0.001)
 
 Calculate the T-Matrix of the scatterer.
 
-Positional parameters:
+Parameters:
 
 - `scatterer`: The scatterer.
 - `ngstart`: The starting point of `ngauss`.
 - `nstart`: The starting point of `nmax`.
 - `routine`: The iteration routine function generated by a routine generator, internally or customly implemented.
 
-Named parameters:
-
-- `approx_matrix_inv`: If set to `true`, `approx_inv` will be used instead of accurate `inv` when using `Arb`.
-
 """
 function calc_tmatrix!(
     scatterer::AbstractScatterer{T},
     ngstart::Int64,
     nstart::Int64,
-    routine::Function;
-    approx_matrix_inv::Bool = false,
+    routine::Function,
 ) where {T<:Real}
     ngauss, nmax = ngstart, nstart
     while true
@@ -478,11 +465,11 @@ function calc_tmatrix!(
     end
 
     @debug "Calculate T-Matrix for m = 0"
-    T0, _ = tmatr0!(scatterer, ngauss, nmax, approx_matrix_inv = approx_matrix_inv)
+    T0, _ = tmatr0!(scatterer, ngauss, nmax)
     TT = [T0]
     for m in 1:nmax
         @debug "Calculate T-Matrix for m = $m"
-        Tm, _ = tmatr!(scatterer, m, ngauss, nmax, approx_matrix_inv = approx_matrix_inv)
+        Tm, _ = tmatr!(scatterer, m, ngauss, nmax)
         push!(TT, Tm)
     end
 
@@ -1075,12 +1062,7 @@ function vary(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where
     return r, dr, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s
 end
 
-function tmatr0!(
-    scatterer::AbstractScatterer{T},
-    ngauss::Int64,
-    nmax::Int64;
-    approx_matrix_inv::Bool = false,
-) where {T<:Real}
+function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) where {T<:Real}
     sym = has_symmetric_plane(scatterer)
     update!(scatterer, ngauss, nmax)
 
@@ -1196,13 +1178,7 @@ function tmatr0!(
     return T0, Q, RgQ
 end
 
-function tmatr!(
-    scatterer::AbstractScatterer{T},
-    m::Int64,
-    ngauss::Int64,
-    nmax::Int64;
-    approx_matrix_inv::Bool = false,
-) where {T<:Real}
+function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::Int64;) where {T<:Real}
     sym = has_symmetric_plane(scatterer)
     update!(scatterer, ngauss, nmax)
 
@@ -1387,7 +1363,7 @@ function tmatr!(
     return Tm, Q, RgQ
 end
 
-function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64; approx_matrix_inv::Bool = false)
+function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
     sym = has_symmetric_plane(scatterer)
     update!(scatterer, ngauss, nmax)
 
@@ -1504,7 +1480,7 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64; 
     Q = vcat(hcat(Q11, ArbMatrix(nmax, nmax)), hcat(ArbMatrix(nmax, nmax), Q22))
     RgQ = vcat(hcat(RgQ11, ArbMatrix(nmax, nmax)), hcat(ArbMatrix(nmax, nmax), RgQ22))
 
-    if approx_matrix_inv
+    if ARB_APPROX_MATRIX_INV[]
         T0 = -RgQ * approx_inv(Q)
     else
         T0 = -RgQ * inv(Q)
@@ -1515,13 +1491,7 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64; 
     return T0, Q, RgQ
 end
 
-function tmatr!(
-    scatterer::AbstractScatterer{Arb},
-    m::Int64,
-    ngauss::Int64,
-    nmax::Int64;
-    approx_matrix_inv::Bool = false,
-)
+function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax::Int64;)
     sym = has_symmetric_plane(scatterer)
     update!(scatterer, ngauss, nmax)
 
@@ -1706,7 +1676,7 @@ function tmatr!(
     Q = vcat(hcat(Q11, Q12), hcat(Q21, Q22))
     RgQ = vcat(hcat(RgQ11, RgQ12), hcat(RgQ21, RgQ22))
 
-    if approx_matrix_inv
+    if ARB_APPROX_MATRIX_INV[]
         Tm = -RgQ * approx_inv(Q)
     else
         Tm = -RgQ * inv(Q)
