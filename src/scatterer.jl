@@ -334,10 +334,12 @@ Parameters:
 - `ndgs`: Determines the initial value of `ngauss` as `ndgs * nmax`. The initial value of `nmax` is determined by the formula $\max(4, \lfloor kr + 4.05 * \sqrt[3]{kr}\rfloor)$.
 
 """
-function tmatrix_routine_mishchenko(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64) where {T<:Real}
+function tmatrix_routine_mishchenko(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64; nstart::Int64=0, ngstart::Int64=0) where {T<:Real}
     kr = 2 * T(π) * scatterer.rev / scatterer.λ
-    nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
-    ngstart = nstart * ndgs
+    if nstart == 0
+        nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
+        ngstart = nstart * ndgs
+    end
     Qsca0 = zero(T)
     Qext0 = zero(T)
     nmax_convergence = false
@@ -386,10 +388,12 @@ Parameters:
 - `ndgs`: Determines the initial value of `ngauss` as `ndgs * nmax`. The initial value of `nmax` is determined by the formula $\max(4, \lfloor kr + 4.05 * \sqrt[3]{kr}\rfloor)$.
 
 """
-function tmatrix_routine_mishchenko_nmaxonly(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64) where {T<:Real}
+function tmatrix_routine_mishchenko_nmaxonly(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64; nstart::Int64=0, ngstart::Int64=0) where {T<:Real}
     kr = 2 * T(π) * scatterer.rev / scatterer.λ
-    nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
-    ngstart = nstart * ndgs
+    if nstart == 0
+        nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
+        ngstart = nstart * ndgs
+    end
     Qsca0 = zero(T)
     Qext0 = zero(T)
 
@@ -674,7 +678,7 @@ Calculate the phase matrix using the given amplitude matrix $\mathbf{S}$.
 function calc_phase(S::AbstractMatrix)
     @assert size(S) == (2, 2)
 
-    Z = zeros(ComplexF64, 4, 4)
+    Z = zeros(eltype(S), 4, 4)
     Z[1, 1] = 0.5 * (S[1, 1] * S[1, 1]' + S[1, 2] * S[1, 2]' + S[2, 1] * S[2, 1]' + S[2, 2] * S[2, 2]')
     Z[1, 2] = 0.5 * (S[1, 1] * S[1, 1]' - S[1, 2] * S[1, 2]' + S[2, 1] * S[2, 1]' - S[2, 2] * S[2, 2]')
     Z[1, 3] = -S[1, 1] * S[1, 2]' - S[2, 2] * S[2, 1]'
