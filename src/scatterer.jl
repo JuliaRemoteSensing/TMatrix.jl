@@ -926,6 +926,22 @@ function calc_expansion_coefficients(TT::Vector{<:AbstractMatrix}, Csca::Real, �
     return α₁, α₂, α₃, α₄, β₁, β₂
 end
 
+function calc_scattering_matrix(α₁::AbstractVector{T}, α₂::AbstractVector{T}, α₃::AbstractVector{T}, α₄::AbstractVector{T}, β₁::AbstractVector{T}, β₂::AbstractVector{T}, Θ::Real) where {T<:Real}
+    lmax = length(α₁) - 1
+    Θ = Float64(Θ) / 180 * π
+
+    F₁₁ = sum(α₁[l] * WignerD.wignerdjmn(l, 0, 0, Θ) for l in 0:lmax)
+    F₂₂₊₃₃ = sum((α₂[l] + α₃[l]) * WignerD.wignerdjmn(l, 2, 2, Θ) for l in 2:lmax)
+    F₂₂₋₃₃ = sum((α₂[l] - α₃[l]) * WignerD.wignerdjmn(l, 2, -2, Θ) for l in 2:lmax)
+    F₂₂ = (F₂₂₊₃₃ + F₂₂₋₃₃) / 2
+    F₃₃ = F₂₂₊₃₃ - F₂₂
+    F₄₄ = sum(α₄[l] * WignerD.wignerdjmn(l, 0, 0, Θ) for l in 0:lmax)
+    F₁₂ = -sum(β₁[l] * WignerD.wignerdjmn(l, 0, 2, Θ) for l in 2:lmax)
+    F₃₄ = -sum(β₂[l] * WignerD.wignerdjmn(l, 0, 2, Θ) for l in 2:lmax)
+
+    return F₁₁, F₂₂, F₃₃, F₄₄, F₁₂, F₃₄
+end
+
 function theta_split!(
     scatterer::AbstractScatterer{T},
     ngauss::Int64,
