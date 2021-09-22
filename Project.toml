@@ -9,6 +9,8 @@ FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+TMatrix_jll = "f6676dc9-6ae6-5380-b4ed-33bd8634dc70"
+WignerSymbols = "9f57e263-0b3d-5e2e-b1be-24f2bb48858b"
 
 [compat]
 julia = "1.6"

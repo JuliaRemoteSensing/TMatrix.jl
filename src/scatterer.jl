@@ -6,6 +6,10 @@ const DEFAULT_NGCAP = Ref{Int64}(500)
 const CHEBYSHEV_DEFAULT_GAUSSIAN_POINTS = Ref{Int64}(60)
 const ARB_APPROX_MATRIX_INV = Ref{Bool}(false)
 
+function arb_set_approx_inv(t::Bool = true)
+    return ARB_APPROX_MATRIX_INV[] = t
+end
+
 @doc raw"""
 Accompanied information of a scatterer.
 """
@@ -186,13 +190,13 @@ end
 @doc raw"""
 A Chebyshev scatterer defined by
 
-$r(\theta, \phi)=r_0(1+\varepsilon T_n(\cos\theta))$
+    $r(\theta, \phi)=r_0(1+\varepsilon T_n(\cos\theta))$
 
 in which $T_n(\cos\theta)=\cos n\theta$.
 
 Attributes:
 
-- `rev`: The equivalent volume radius.
+    - `rev`: The equivalent volume radius.
 - `m`: The complex refractive index.
 - `ε`: The deformation parameter, which satisfies $0\le\varepsilon<1$.
 - `n`: The degree of the Chebyshev polynomial.
@@ -334,7 +338,13 @@ Parameters:
 - `ndgs`: Determines the initial value of `ngauss` as `ndgs * nmax`. The initial value of `nmax` is determined by the formula $\max(4, \lfloor kr + 4.05 * \sqrt[3]{kr}\rfloor)$.
 
 """
-function tmatrix_routine_mishchenko(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64; nstart::Int64=0, ngstart::Int64=0) where {T<:Real}
+function tmatrix_routine_mishchenko(
+    scatterer::AbstractScatterer{T},
+    ddelta::T,
+    ndgs::Int64;
+    nstart::Int64 = 0,
+    ngstart::Int64 = 0,
+) where {T<:Real}
     kr = 2 * T(π) * scatterer.rev / scatterer.λ
     if nstart == 0
         nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
@@ -388,7 +398,13 @@ Parameters:
 - `ndgs`: Determines the initial value of `ngauss` as `ndgs * nmax`. The initial value of `nmax` is determined by the formula $\max(4, \lfloor kr + 4.05 * \sqrt[3]{kr}\rfloor)$.
 
 """
-function tmatrix_routine_mishchenko_nmaxonly(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64; nstart::Int64=0, ngstart::Int64=0) where {T<:Real}
+function tmatrix_routine_mishchenko_nmaxonly(
+    scatterer::AbstractScatterer{T},
+    ddelta::T,
+    ndgs::Int64;
+    nstart::Int64 = 0,
+    ngstart::Int64 = 0,
+) where {T<:Real}
     kr = 2 * T(π) * scatterer.rev / scatterer.λ
     if nstart == 0
         nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
@@ -485,7 +501,7 @@ end
 @doc raw"""
 ```
 calc_amplitude(scatterer::Scatterer, tmatrix::Union{Array{Float64,2},Nothing}, ϑ_i::Float64, φ_i::Float64, ϑ_s::Float64, φ_s::Float64)
-```
+    ```
 
 Calculate the amplitude matrix and the phase matrix, given the scatterer and the geometry of the incident and the scattered beam. Use pre-computed T-Matrix when possible.
 
@@ -709,12 +725,205 @@ function calc_SZ(
     ϑ_s::T,
     φ_i::T,
     φ_s::T,
-    tmatrix::Union{Vector{<:AbstractMatrix},Nothing} = nothing,
+    TT::Union{Vector{<:AbstractMatrix},Nothing} = nothing,
 ) where {T<:Real}
-    S = calc_S(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, tmatrix)
+    S = calc_S(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, TT)
     Z = calc_Z(S)
 
     return S, Z
+end
+
+function hovenr(α₁, α₂, α₃, α₄, β₁, β₂)
+    valid = true
+
+    for l in eachindex(α₁)
+        dl = 2l + 1
+        ddl = 0.48dl
+        if (l >= 1 && abs(α₁[l]) >= dl) ||
+           abs(α₂[l]) >= dl ||
+           abs(α₃[l]) >= dl ||
+           abs(α₄[l]) >= dl ||
+           abs(β₁[l]) >= ddl ||
+           abs(β₂[l]) >= ddl
+            @warn "Test of Van der Mee & Hovenier failed at L = $l"
+            valid = false
+            break
+        end
+
+        for c in 0:0.1:1.0
+            cc = c^2
+            c1 = cc * β₂[l]^2
+            c2 = c * α₄[l]
+            c3 = c * α₃[l]
+            if (dl - c * α₁[l]) * (dl - c * α₂[l]) - cc * β₁[l]^2 <= -1e-4 ||
+               (dl - c2) * (dl - c3) + c1 <= -1e-4 ||
+               (dl + c2) * (dl - c3) - c1 <= -1e-4 ||
+               (dl - c2) * (dl + c3) - c1 <= -1e-4
+                valid = false
+                break
+            end
+        end
+
+        if !valid
+            @warn "Test of Van der Mee & Hovenier failed at L = $l"
+            break
+        end
+    end
+
+    if valid
+        @debug "Test of Van der Mee & Hovenier passed"
+    end
+end
+
+function calc_expansion_coefficients(TT::Vector{<:AbstractMatrix}, Csca::Real, λ::Real)
+    CT = eltype(TT[1])
+    T = typeof(real(TT[1][1, 1]))
+    nmax = length(TT) - 1
+    Csca = T(Csca)
+    λ = T(λ)
+
+    ci = OffsetArray([CT(1.0im)^i for i in (-nmax):nmax], (-nmax):nmax)
+    s = OffsetArray([T(2i + 1) for i in 0:(2nmax)], 0:(2nmax))
+    ss = sqrt.(s)
+    sig = OffsetArray([1 - 2 * (i % 2) for i in 0:(4nmax)], 0:(4nmax))
+
+    T1 = OffsetArray(zeros(CT, 2nmax + 1, nmax), (-nmax):nmax, 1:nmax)
+    T2 = OffsetArray(zeros(CT, 2nmax + 1, nmax), (-nmax):nmax, 1:nmax)
+    A1 = zeros(CT, nmax)
+    A2 = zeros(CT, nmax)
+    B1 = OffsetArray(zeros(CT, 2nmax + 1, 2nmax + 1, nmax), 0:(2nmax), (-nmax):nmax, 1:nmax)
+    B2 = OffsetArray(zeros(CT, 2nmax + 1, 2nmax + 1, nmax), 0:(2nmax), (-nmax):nmax, 1:nmax)
+
+    for n in 1:nmax
+        # Calculate T1 and T2
+        for n′ in 1:nmax
+            for m in 0:min(n, n′)
+                nₒ = max(0, m - 1)
+                nₗ = nmax - nₒ
+                T11 = TT[m + 1][n - nₒ, n′ - nₒ]
+                T12 = TT[m + 1][n - nₒ, n′ - nₒ + nₗ]
+                T21 = TT[m + 1][n - nₒ + nₗ, n′ - nₒ]
+                T22 = TT[m + 1][n - nₒ + nₗ, n′ - nₒ + nₗ]
+                T1[m, n′] = T11 + T12 + T21 + T22
+                T2[m, n′] = T11 + T12 - T21 - T22
+
+                if m != 0
+                    T1[-m, n′] = T11 - T12 - T21 + T22
+                    T2[-m, n′] = T11 - T12 + T21 - T22
+                end
+            end
+        end
+
+        for n₁ in 0:(nmax + n)
+            # Calculate A1 and A2
+            for n′ in max(1, abs(n - n₁)):min(nmax, n₁ + n)
+                A1[n′] = zero(CT)
+                A2[n′] = zero(CT)
+                for m₁ in (-min(n, n′)):min(n, n′)
+                    cg = clebschgordan(T, n, m₁, n₁, 0, n′)
+                    A1[n′] += cg * T1[m₁, n′]
+                    A2[n′] += cg * T2[m₁, n′]
+                end
+                A1[n′] *= ci[n′ - n] / ss[n′]
+                A2[n′] *= ci[n′ - n] / ss[n′]
+            end
+
+            # Calculate B1 and B2
+            for m in max(1 - n₁, -n):min(n₁ + 1, n)
+                for n′ in max(1, abs(n - n₁)):min(nmax, n₁ + n)
+                    cg = clebschgordan(T, n, m, n₁, 1 - m, n′)
+                    B1[n₁, m, n] += cg * A1[n′]
+                    B2[n₁, m, n] += cg * A2[n′]
+                end
+            end
+        end
+    end
+
+    # Calculate D
+    D₀₀ = OffsetArray(zeros(T, 2nmax + 1, nmax, nmax), (-nmax):nmax, 1:nmax, 1:nmax)
+    D₀₋₀ = OffsetArray(zeros(T, 2nmax + 1, nmax, nmax), (-nmax):nmax, 1:nmax, 1:nmax)
+    D₂₂ = OffsetArray(zeros(T, 2nmax + 1, nmax, nmax), (-nmax):nmax, 1:nmax, 1:nmax)
+    D₂₋₂ = OffsetArray(zeros(T, 2nmax + 1, nmax, nmax), (-nmax):nmax, 1:nmax, 1:nmax)
+    D₀₂ = OffsetArray(zeros(CT, 2nmax + 1, nmax, nmax), (-nmax):nmax, 1:nmax, 1:nmax)
+
+    for n in 1:nmax
+        for n′ in 1:nmax
+            for m in (-min(n, n′)):min(n, n′)
+                for n₁ in abs(m - 1):(min(n, n′) + nmax)
+                    D₀₀[m, n′, n] += s[n₁] * real(B1[n₁, m, n] * B1[n₁, m, n′]')
+                    D₀₋₀[m, n′, n] += s[n₁] * real(B2[n₁, m, n] * B2[n₁, m, n′]')
+                end
+            end
+
+            for m in max(-n, -n′ + 2):min(n, n′ + 2)
+                for n₁ in abs(m - 1):(min(n, n′) + nmax)
+                    D₂₂[m, n′, n] += s[n₁] * real(B1[n₁, m, n] * B1[n₁, 2 - m, n′]')
+                    D₂₋₂[m, n′, n] += s[n₁] * real(B2[n₁, m, n] * B2[n₁, 2 - m, n′]')
+                    D₀₂[m, n′, n] += s[n₁] * B2[n₁, m, n] * B1[n₁, 2 - m, n′]'
+                end
+            end
+        end
+    end
+
+    h_const = λ^2 / (Csca * 4 * π)
+    h = OffsetArray(
+        [s[l] * h_const * ss[n] / ss[n′] for l in 0:(2nmax), n in 1:nmax, n′ in 1:nmax],
+        0:(2nmax),
+        1:nmax,
+        1:nmax,
+    )
+
+    # Calculate g
+    g₀₀ = OffsetArray(zeros(T, 2nmax + 1), 0:(2nmax))
+    g₀₋₀ = OffsetArray(zeros(T, 2nmax + 1), 0:(2nmax))
+    g₂₂ = OffsetArray(zeros(T, 2nmax + 1), 0:(2nmax))
+    g₂₋₂ = OffsetArray(zeros(T, 2nmax + 1), 0:(2nmax))
+    g₀₂ = OffsetArray(zeros(CT, 2nmax + 1), 0:(2nmax))
+
+    for l in 0:(2nmax)
+        for n in 1:nmax
+            for n′ in max(1, abs(n - l)):min(nmax, n + l)
+                cg1 = clebschgordan(T, n, 1, l, 0, n′)
+                sm₀₀ = zero(T)
+                sm₀₋₀ = zero(T)
+                for m in (-min(n, n′)):min(n, n′)
+                    cg = clebschgordan(T, n, m, l, 0, n′)
+                    sm₀₀ += cg * D₀₀[m, n′, n]
+                    sm₀₋₀ += cg * D₀₋₀[m, n′, n]
+                end
+                g₀₀[l] += h[l, n, n′] * cg1 * sm₀₀
+                g₀₋₀[l] += h[l, n, n′] * cg1 * sig[n + n′ + l] * sm₀₋₀
+
+                if l >= 2
+                    cg2 = clebschgordan(T, n, -1, l, 2, n′)
+                    sm₂₂ = zero(T)
+                    sm₂₋₂ = zero(T)
+                    sm₀₂ = zero(CT)
+                    for m in max(-n, -n′ + 2):min(n, n′ + 2)
+                        cg = clebschgordan(T, n, -m, l, 2, n′)
+                        sm₂₂ += cg * D₂₂[m, n′, n]
+                        sm₂₋₂ += cg * D₂₋₂[m, n′, n]
+                        sm₀₂ += cg * D₀₂[m, n′, n]
+                    end
+                    g₂₂[l] += h[l, n, n′] * cg2 * sm₂₂
+                    g₂₋₂[l] += h[l, n, n′] * cg2 * sig[n + n′ + l] * sm₂₋₂
+                    g₀₂[l] += -h[l, n, n′] * cg1 * sm₀₂
+                end
+            end
+        end
+    end
+
+    α₁ = g₀₀ + g₀₋₀
+    α₂ = g₂₂ + g₂₋₂
+    α₃ = g₂₂ - g₂₋₂
+    α₄ = g₀₀ - g₀₋₀
+    β₁ = 2real.(g₀₂)
+    β₂ = 2imag.(g₀₂)
+
+    # Validate the expansion coefficients
+    hovenr(α₁, α₂, α₃, α₄, β₁, β₂)
+
+    return α₁, α₂, α₃, α₄, β₁, β₂
 end
 
 function theta_split!(

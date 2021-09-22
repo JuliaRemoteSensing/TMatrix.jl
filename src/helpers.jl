@@ -115,15 +115,10 @@ sphericalbesselj!(x::T, nmax::Int64, y::AbstractArray{T}, u::AbstractArray{T}) w
 
 For `Arb` and `Acb`, use `Arblib.hypegeom_bessel_j!` instead.
 """
-function sphericalbesselj!(
-    x::T,
-    nmax::Int64,
-    jkr::AbstractArray{T},
-    djkr::AbstractArray{T},
-) where {T<:Union{Arb,Acb}}
+function sphericalbesselj!(x::T, nmax::Int64, jkr::AbstractArray{T}, djkr::AbstractArray{T}) where {T<:Union{Arb,Acb}}
     x1 = 1 / x
     y0 = zero(x)
-    half = T(1//2)
+    half = T(1 // 2)
     coeff = √(T(π) / 2x)
     Arblib.hypgeom_bessel_j!(y0, half, x)
     for i in 1:nmax
@@ -172,7 +167,7 @@ For `Arb` and `Acb`, use `Arblib.hypegeom_bessel_y!` instead.
 function sphericalbessely!(x::T, nmax::Int64, ykr::AbstractArray{T}, dykr::AbstractArray{T}) where {T<:Union{Arb,Acb}}
     x1 = 1 / x
     y0 = zero(x)
-    half = T(1//2)
+    half = T(1 // 2)
     coeff = √(T(π) / 2x)
     Arblib.hypgeom_bessel_y!(y0, half, x)
     for i in 1:nmax
@@ -197,7 +192,7 @@ function sphericalbessely(x::T, nmax::Int64) where {T<:Number}
     return y, v
 end
 
-function cross_section(TT::Vector{<:AbstractMatrix{CT}}, λ::T) where {T<:Real, CT<:Number}
+function cross_section(TT::Vector{<:AbstractMatrix{CT}}, λ::T) where {T<:Real,CT<:Number}
     nmax = length(TT) - 1
 
     Qsca = zero(λ)
@@ -238,7 +233,7 @@ function cross_section(TT::Vector{<:AbstractMatrix{CT}}, λ::T) where {T<:Real, 
         end
     end
 
-    coeff = 0.5 * λ^2 / π
+    coeff = λ^2 / 2 / π
     Csca = abs(real(Qsca)) * coeff
     Cext = abs(Qext) * coeff
     ω = Csca / Cext
@@ -267,7 +262,7 @@ function gausslegendre(T::Type{<:Real}, n::Integer)
     return [T(ref(x, i)) for i in 1:n], [T(ref(w, i)) for i in 1:n]
 end
 
-function gausslegendre(::Type{<:Union{Arb, ArbRef}}, n::Integer)
+function gausslegendre(::Type{<:Union{Arb,ArbRef}}, n::Integer)
     x = ArbVector(n)
     w = ArbVector(n)
     for i in 1:(n ÷ 2)
@@ -278,4 +273,13 @@ function gausslegendre(::Type{<:Union{Arb, ArbRef}}, n::Integer)
         w[i] = ref(w, n + 1 - i)
     end
     return x, w
+end
+
+function ccg(T::Type{<:Real}, n::Int64, n1::Int64, nmax::Int64, k1::Int64, k2::Int64)
+    m_l = (k1 == 1 && k2 == 0) ? 0 : -n
+
+    return [
+        (m >= m_l && nn >= max(m * k1 + k2, n - n1)) ? clebschgordan(T, n, m, n1, m * (k1 - 1) + k2, nn) : zero(T) for
+        m in (-n):n, nn in 0:min(n + n1, nmax)
+    ]
 end

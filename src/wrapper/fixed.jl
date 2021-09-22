@@ -1,6 +1,7 @@
-module Wrapper
+module Fixed
 
-using Libdl
+using OffsetArrays
+using TMatrix_jll
 
 const NPN1 = 100
 const NPN2 = 2NPN1
@@ -11,35 +12,37 @@ const NPN6 = NPN4 + 1
 const NPL = NPN2 + 1
 const NPNG1 = 500
 const NPNG2 = 2NPNG1
-const TM_LIB = Ref{Ptr}()
-
-function __init__()
-    return TM_LIB[] = Libdl.dlopen(joinpath(@__DIR__, "..", "shared", "tmatrix.so"))
-end
 
 function sarea(e::Float64)
-    ratio = zeros(1)
-    ccall(Libdl.dlsym(TM_LIB[], :sarea_), Cvoid, (Ref{Float64}, Ptr{Float64}), e, ratio)
-    return ratio[1]
+    ratio = Ref{Float64}()
+    ccall((:sarea_, tmatrix_fixed_orientation), Cvoid, (Ref{Float64}, Ref{Float64}), e, ratio)
+    return ratio[]
 end
 
 function sareac(e::Float64)
-    ratio = zeros(1)
-    ccall(Libdl.dlsym(TM_LIB[], :sareac_), Cvoid, (Ref{Float64}, Ptr{Float64}), e, ratio)
-    return ratio[1]
+    ratio = Ref{Float64}()
+    ccall((:sareac_, tmatrix_fixed_orientation), Cvoid, (Ref{Float64}, Ref{Float64}), e, ratio)
+    return ratio[]
 end
 
 function surfch(n::Int64, e::Float64)
-    ratio = zeros(1)
-    ccall(Libdl.dlsym(TM_LIB[], :surfch_), Cvoid, (Ref{Int32}, Ref{Float64}, Ptr{Float64}), convert(Int32, n), e, ratio)
-    return ratio[1]
+    ratio = Ref{Float64}()
+    ccall(
+        (:surfch_, tmatrix_fixed_orientation),
+        Cvoid,
+        (Ref{Int32}, Ref{Float64}, Ref{Float64}),
+        convert(Int32, n),
+        e,
+        ratio,
+    )
+    return ratio[]
 end
 
 function gauss(ngauss::Int64)
     z = zeros(ngauss)
     w = zeros(ngauss)
     ccall(
-        Libdl.dlsym(TM_LIB[], :gauss_),
+        (:gauss_, tmatrix_fixed_orientation),
         Cvoid,
         (Ref{Int32}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}),
         convert(Int32, ngauss),
@@ -59,7 +62,7 @@ function rsp1(ngauss::Int, rev::Float64, e::Float64)
     x, _ = constant(ngauss, 1, np, e)
 
     ccall(
-        Libdl.dlsym(TM_LIB[], :rsp1_),
+        (:rsp1_, tmatrix_fixed_orientation),
         Cvoid,
         (Ptr{Float64}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}),
         x,
@@ -82,7 +85,7 @@ function rsp2(ngauss::Int64, rev::Float64, e::Float64, n::Int64)
     x, _ = constant(ngauss, 1, np, e)
 
     ccall(
-        Libdl.dlsym(TM_LIB[], :rsp2_),
+        (:rsp2_, tmatrix_fixed_orientation),
         Cvoid,
         (Ptr{Float64}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}),
         x,
@@ -104,7 +107,7 @@ function rsp3(ngauss::Int64, rev::Float64, e::Float64)
     x, _ = constant(ngauss, 1, np, e)
 
     ccall(
-        Libdl.dlsym(TM_LIB[], :rsp3_),
+        (:rsp3_, tmatrix_fixed_orientation),
         Cvoid,
         (Ptr{Float64}, Ref{Int32}, Ref{Int32}, Ref{Float64}, Ref{Float64}, Ptr{Float64}, Ptr{Float64}),
         x,
@@ -126,7 +129,7 @@ function constant(ngauss::Int64, nmax::Int64, np::Int64, e::Float64)
     s = zeros(NPNG2)
     ss = zeros(NPNG2)
     ccall(
-        Libdl.dlsym(TM_LIB[], :const_),
+        (:const_, tmatrix_fixed_orientation),
         Cvoid,
         (
             Ref{Int32},
@@ -171,16 +174,16 @@ function vary(
     mrr = real(m)
     mri = imag(m)
     p = float(π)
-    ppi = zeros(1)
-    pir = zeros(1)
-    pii = zeros(1)
+    ppi = Ref{Float64}()
+    pir = Ref{Float64}()
+    pii = Ref{Float64}()
     r = zeros(NPNG2)
     dr = zeros(NPNG2)
     ddr = zeros(NPNG2)
     drr = zeros(NPNG2)
     dri = zeros(NPNG2)
     ccall(
-        Libdl.dlsym(TM_LIB[], :vary_),
+        (:vary_, tmatrix_fixed_orientation),
         Cvoid,
         (
             Ref{Float64},
@@ -192,9 +195,9 @@ function vary(
             Ref{Int32},
             Ptr{Float64},
             Ref{Float64},
-            Ptr{Float64},
-            Ptr{Float64},
-            Ptr{Float64},
+            Ref{Float64},
+            Ref{Float64},
+            Ref{Float64},
             Ptr{Float64},
             Ptr{Float64},
             Ptr{Float64},
@@ -222,7 +225,7 @@ function vary(
         convert(Int32, nmax),
     )
 
-    cbess_ptr = cglobal(Libdl.dlsym(TM_LIB[], :cbess_), UInt64)
+    cbess_ptr = cglobal((:cbess_, tmatrix_fixed_orientation), UInt64)
     blk_len = NPNG2 * NPN1 * 8
     jkr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr), (NPNG2, NPN1))[1:ngauss, 1:nmax]
     ykr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len), (NPNG2, NPN1))[1:ngauss, 1:nmax]
@@ -248,7 +251,7 @@ function vig(nmax::Int64, m::Int64, x::Float64)
     dv1 = zeros(nmax)
     dv2 = zeros(nmax)
     ccall(
-        Libdl.dlsym(TM_LIB[], :vig_),
+        (:vig_, tmatrix_fixed_orientation),
         Cvoid,
         (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}),
         x,
@@ -264,7 +267,7 @@ function vigampl(nmax::Int64, m::Int64, x::Float64)
     dv1 = zeros(nmax)
     dv2 = zeros(nmax)
     ccall(
-        Libdl.dlsym(TM_LIB[], :vigampl_),
+        (:vigampl_, tmatrix_fixed_orientation),
         Cvoid,
         (Ref{Float64}, Ref{Int32}, Ref{Int32}, Ptr{Float64}, Ptr{Float64}),
         x,
@@ -280,7 +283,7 @@ function rjb(x::Float64, n::Int64, nn::Int64)
     y = zeros(n)
     u = zeros(n)
     ccall(
-        Libdl.dlsym(TM_LIB[], :rjb_),
+        (:rjb_, tmatrix_fixed_orientation),
         Cvoid,
         (Ref{Float64}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ref{Int32}),
         x,
@@ -297,7 +300,7 @@ function ryb(x::Float64, n::Int64)
     y = zeros(n)
     u = zeros(n)
     ccall(
-        Libdl.dlsym(TM_LIB[], :ryb_),
+        (:ryb_, tmatrix_fixed_orientation),
         Cvoid,
         (Ref{Float64}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}),
         x,
@@ -317,7 +320,7 @@ function cjb(x::ComplexF64, n::Int64, nn::Int64)
     ur = zeros(n)
     ui = zeros(n)
     ccall(
-        Libdl.dlsym(TM_LIB[], :cjb_),
+        (:cjb_, tmatrix_fixed_orientation),
         Cvoid,
         (Ref{Float64}, Ref{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ptr{Float64}, Ref{Int32}, Ref{Int32}),
         xr,
@@ -346,7 +349,7 @@ function tmatr0(ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ::Float64, 
     end
 
     ccall(
-        Libdl.dlsym(TM_LIB[], :tmatr0_),
+        (:tmatr0_, tmatrix_fixed_orientation),
         Cvoid,
         (
             Ref{Int32},
@@ -386,7 +389,7 @@ function tmatr0(ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ::Float64, 
         ncheck,
     )
 
-    ctt_ptr = cglobal(Libdl.dlsym(TM_LIB[], :ctt_), UInt64)
+    ctt_ptr = cglobal((:ctt_, tmatrix_fixed_orientation), UInt64)
     blk_len = NPN2 * NPN2 * 8
     QR = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr), (NPN2, NPN2))[1:(2nmax), 1:(2nmax)]
     QI = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr + blk_len), (NPN2, NPN2))[1:(2nmax), 1:(2nmax)]
@@ -397,7 +400,7 @@ function tmatr0(ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ::Float64, 
     Q = complex.(QR, QI)
     RgQ = complex.(RgQR, RgQI)
 
-    ct_ptr = cglobal(Libdl.dlsym(TM_LIB[], :ct_), UInt64)
+    ct_ptr = cglobal((:ct_, tmatrix_fixed_orientation), UInt64)
     TR1 = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ct_ptr), (NPN2, NPN2))[1:(2nmax), 1:(2nmax)]
     TI1 = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ct_ptr + blk_len), (NPN2, NPN2))[1:(2nmax), 1:(2nmax)]
 
@@ -417,7 +420,7 @@ function tmatr(mm::Int64, ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ:
     end
 
     ccall(
-        Libdl.dlsym(TM_LIB[], :tmatr_),
+        (:tmatr_, tmatrix_fixed_orientation),
         Cvoid,
         (
             Ref{Int32},
@@ -459,7 +462,7 @@ function tmatr(mm::Int64, ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ:
         ncheck,
     )
 
-    ctt_ptr = cglobal(Libdl.dlsym(TM_LIB[], :ctt_), UInt64)
+    ctt_ptr = cglobal((:ctt_, tmatrix_fixed_orientation), UInt64)
     blk_len = NPN2 * NPN2 * 8
     nm = nmax - mm + 1
     QR = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ctt_ptr), (NPN2, NPN2))[1:(2nm), 1:(2nm)]
@@ -470,7 +473,7 @@ function tmatr(mm::Int64, ngauss::Int64, nmax::Int64, np::Int64, e::Float64, λ:
     Q = complex.(QR, QI)
     RgQ = complex.(RgQR, RgQI)
 
-    ct_ptr = cglobal(Libdl.dlsym(TM_LIB[], :ct_), UInt64)
+    ct_ptr = cglobal((:ct_, tmatrix_fixed_orientation), UInt64)
     TR1 = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ct_ptr), (NPN2, NPN2))[1:(2nm), 1:(2nm)]
     TI1 = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, ct_ptr + blk_len), (NPN2, NPN2))[1:(2nm), 1:(2nm)]
 
@@ -511,7 +514,7 @@ function calc_tmatrix(
     nmax = zeros(Int32, 1)
 
     ccall(
-        Libdl.dlsym(TM_LIB[], :calctmat_),
+        (:calctmat_, tmatrix_fixed_orientation),
         Cvoid,
         (
             Ref{Float64},
@@ -537,7 +540,7 @@ function calc_tmatrix(
         nmax,
     )
 
-    tmat_ptr = cglobal(Libdl.dlsym(TM_LIB[], :tmat_), UInt64)
+    tmat_ptr = cglobal((:tmat_, tmatrix_fixed_orientation), UInt64)
     blk_len = NPN6 * NPN4 * NPN4 * 4
     RT11 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32}, tmat_ptr), (NPN6, NPN4, NPN4))
     RT12 = unsafe_wrap(Array{Float32,3}, convert(Ptr{Float32}, tmat_ptr + blk_len), (NPN6, NPN4, NPN4))
@@ -590,7 +593,7 @@ function calc_amplitude(
     Z = zeros(16)
 
     ccall(
-        Libdl.dlsym(TM_LIB[], :calcampl_),
+        (:calcampl_, tmatrix_fixed_orientation),
         Cvoid,
         (
             Ref{Int32},
