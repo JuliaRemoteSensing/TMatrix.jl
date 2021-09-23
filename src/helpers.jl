@@ -19,21 +19,21 @@ function vig!(nmax::Int64, m::Int64, x::T, dv1::AbstractArray, dv2::AbstractArra
         d2 = x
         for i in 1:nmax
             d3 = (T(2i + 1) * x * d2 - i * d1) / (i + 1)
-            der = qs1 * T(i * (i + 1) / (2i + 1)) * (d3 - d1)
+            der = qs1 * i * (i + 1) / (2i + 1) * (d3 - d1)
             dv1[i] = d2
             dv2[i] = der
             d1, d2 = d2, d3
         end
     else
         for i in 1:m
-            a *= √T((2i - 1) / 2i) * qs
+            a *= √T((2i - 1) // 2i) * qs
         end
         d1 = zero(x)
         d2 = a
         for i in m:nmax
             qnm = √T(i^2 - m^2)
             qnm1 = √T((i + 1)^2 - m^2)
-            d3 = (T(2i + 1) * x * d2 - qnm * d1) / qnm1
+            d3 = ((2i + 1) * x * d2 - qnm * d1) / qnm1
             der = qs1 * (-(i + 1) * qnm * d1 + i * qnm1 * d3) / (2i + 1)
             dv1[i] = d2
             dv2[i] = der
@@ -249,10 +249,10 @@ gausslegendre(::Type{Float64}, n::Integer) = FastGaussQuadrature.gausslegendre(n
 
 function gausslegendre(T::Type{<:Real}, n::Integer)
     prec = precision(T)
-    x = ArbVector(n, prec = prec)
-    w = ArbVector(n, prec = prec)
+    x = ArbVector(n; prec = prec)
+    w = ArbVector(n; prec = prec)
     for i in 1:(n ÷ 2)
-        Arblib.hypgeom_legendre_p_ui_root!(ref(x, i), ref(w, i), UInt64(n), UInt64(i - 1), prec = prec)
+        Arblib.hypgeom_legendre_p_ui_root!(ref(x, i), ref(w, i), UInt64(n), UInt64(i - 1); prec = prec)
     end
     for i in (n - n ÷ 2 + 1):n
         x[i] = -ref(x, n + 1 - i)

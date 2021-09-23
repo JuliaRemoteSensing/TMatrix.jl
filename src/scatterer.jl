@@ -178,6 +178,7 @@ Attributes:
 - `m`: The complex refractive index.
 - `d_to_h`: The diameter-to-height ratio $D/H$.
 - `λ`: The wavelength of the incident wave.
+- `info`: The accompanied information.
 """
 struct Cylinder{T<:Real,CT<:Number,RV,RM,CV,CM} <: AbstractScatterer{T,CT}
     rev::T
@@ -196,11 +197,12 @@ in which $T_n(\cos\theta)=\cos n\theta$.
 
 Attributes:
 
-    - `rev`: The equivalent volume radius.
+- `rev`: The equivalent volume radius.
 - `m`: The complex refractive index.
 - `ε`: The deformation parameter, which satisfies $0\le\varepsilon<1$.
 - `n`: The degree of the Chebyshev polynomial.
 - `λ`: The wavelength of the incident wave.
+- `info`: The accompanied information.
 """
 struct Chebyshev{T<:Real,CT<:Number,RV,RM,CV,CM} <: AbstractScatterer{T,CT}
     rev::T
@@ -216,6 +218,7 @@ Scatterer constructor with named parameters.
 
 Parameters:
 
+- `T`: The data type to be used in future calculations.
 - `r`: The equivalent radius.
 - `shape`: The particle shape. Possible values are `SHAPE_SPHEROID` (default), `SHAPE_CYLINDER` and `SHAPE_CHEBYSHEV`.
 - `axis_ratio`: For spheroids, it is the ratio $a/b$ of the horizontal to rotational axes. For cylinders, it is the diameter-to-length ratio $D/L$. For Chebyshev particles, it is the deformation parameter $\varepsilon$.
@@ -223,6 +226,7 @@ Parameters:
 - `refractive_index`: The complex refractive index.
 - `ngauss`: Number of points for Gaussian integration. Required only for Chebyshev particles.
 - `n`: Degree of the Chebyshev polynomial. Required only for Chebyshev particles.
+- `λ`: The wavelength to be used in future calculations.
 
 """
 function Scatterer(
@@ -244,6 +248,13 @@ function Scatterer(
     axis_ratio = T(axis_ratio)
     refractive_index = Complex{T}(refractive_index)
     λ = T(λ)
+    f12 = T(1 // 2)
+    f32 = T(3 // 2)
+    f14 = T(1 // 4)
+    f34 = T(3 // 4)
+    f13 = T(1 // 3)
+    f23 = T(2 // 3)
+    f43 = T(4 // 3)
 
     if radius_type == RADIUS_EQUAL_VOLUME
         rev = r
@@ -253,43 +264,43 @@ function Scatterer(
             if abs(d - 1.0) < eps(d)
                 ratio = 1.0
             elseif d > 1.0
-                e = √(1.0 - 1.0 / d^2)
-                ratio = 1.0 / √(0.25(2.0d^(2.0 / 3.0) + d^(-4.0 / 3.0) * log((1.0 + e) / (1.0 - e)) / e))
+                e = √(1 - 1 / d^2)
+                ratio = 1 / √(f14 * (2d^f23 + d^(-f43) * log((1 + e) / (1 - e)) / e))
             elseif d < 1.0
-                e = √(1.0 - d^2)
-                ratio = 1.0 / √(0.5(d^(2.0 / 3.0) + d^(-1.0 / 3.0) * asin(e) / e))
+                e = √(1 - d^2)
+                ratio = 1 / √(f12 * (d^f23 + d^(-f13) * asin(e) / e))
             end
         elseif shape == SHAPE_CYLINDER
             e = axis_ratio
-            ratio = ∛(1.5 / e) / √((e + 2.0) / 2.0e)
+            ratio = ∛(f32 / e) / √((e + 2) / 2e)
         elseif shape == SHAPE_CHEBYSHEV
             e = axis_ratio
             en = e * n
             x, w = gausslegendre(T, ngauss)
-            s = 0.0
-            v = 0.0
+            s = zero(T)
+            v = zero(T)
             @simd for i in 1:ngauss
                 θ = acos(x[i])
                 nθ = n * θ
                 sinθ = sin(θ)
                 sinnθ = sin(nθ)
                 cosnθ = cos(nθ)
-                a = 1.0 + e * cosnθ
+                a = 1 + e * cosnθ
                 ens = en * sinnθ
                 s += w[i] * a * √(a^2 + ens^2)
                 v += w[i] * (sinθ * a + x[i] * ens) * sinθ * a^2
             end
-            rs = √(0.5s)
-            rv = ∛(0.75v)
+            rs = √(f12 * s)
+            rv = ∛(f34 * v)
             ratio = rv / rs
         end
 
         rev = r * ratio
     elseif radius_type == RADIUS_MAXIMUM
         if shape == SHAPE_SPHEROID
-            rev = axis_ratio > 1.0 ? r / ∛axis_ratio : r * axis_ratio^(2.0 / 3.0)
+            rev = axis_ratio > 1.0 ? r / ∛axis_ratio : r * axis_ratio^f23
         elseif shape == SHAPE_CYLINDER
-            rev = axis_ratio > 1.0 ? r * ∛(1.5 / axis_ratio) : r * ∛(1.5axis_ratio^2)
+            rev = axis_ratio > 1.0 ? r * ∛(f32 / axis_ratio) : r * ∛(f32 * axis_ratio^2)
         elseif shape == SHAPE_CHEBYSHEV
             e = axis_ratio
             en = e * n
@@ -299,11 +310,11 @@ function Scatterer(
             sinθ = sin.(θ)
             sinnθ = sin.(nθ)
             cosnθ = cos.(nθ)
-            a = e * cosnθ .+ 1.0
+            a = e * cosnθ .+ 1
             ens = en * sinnθ
             v = sum(w .* (sinθ .* a + x .* ens) .* sinθ * a .^ 2)
-            rv = ∛(0.75v)
-            rev = r / (1.0 + e) * rv
+            rv = ∛(f34 * v)
+            rev = r / (1 + e) * rv
         end
     end
 
@@ -336,6 +347,8 @@ Parameters:
 - `scatterer`: The scatterer.
 - `ddelta`: The convergence threshold.
 - `ndgs`: Determines the initial value of `ngauss` as `ndgs * nmax`. The initial value of `nmax` is determined by the formula $\max(4, \lfloor kr + 4.05 * \sqrt[3]{kr}\rfloor)$.
+- `nstart`: Optional for manual setting of the initial value of `nmax`.
+- `ngstart`: Optional for manual setting of the initial value of `ngauss`. This parameter takes effect only if `nstart≠0`.
 
 """
 function tmatrix_routine_mishchenko(
@@ -396,6 +409,8 @@ Parameters:
 - `scatterer`: The scatterer.
 - `ddelta`: The convergence threshold.
 - `ndgs`: Determines the initial value of `ngauss` as `ndgs * nmax`. The initial value of `nmax` is determined by the formula $\max(4, \lfloor kr + 4.05 * \sqrt[3]{kr}\rfloor)$.
+- `nstart`: Optional for manual setting of the initial value of `nmax`.
+- `ngstart`: Optional for manual setting of the initial value of `ngauss`. This parameter takes effect only if `nstart≠0`.
 
 """
 function tmatrix_routine_mishchenko_nmaxonly(
@@ -432,6 +447,21 @@ function tmatrix_routine_mishchenko_nmaxonly(
     return ngstart, nstart, routine
 end
 
+@doc raw"""
+```
+calc_tmatrix!(scatterer::AbstractScatterer{T}) where {T<:Real}
+```
+
+Calculate the T-Matrix of the scatterer with default settings:
+
+- Use `tmatrix_routine_mishchenko` to generate the routine function.
+- Use `ddelta = 0.001` and `ndgs = 4`.
+
+Parameters:
+
+- `scatterer`: The scatterer.
+
+"""
 function calc_tmatrix!(scatterer::AbstractScatterer{T}) where {T<:Real}
     return calc_tmatrix!(scatterer, T(1) / T(1000), 4)
 end
@@ -448,7 +478,7 @@ end
 
 @doc raw"""
 ```
-calc_tmatrix(scatterer::Scatterer, accuracy::Float64=0.001)
+calc_tmatrix(scatterer::AbstractScatterer{T}, ngstart::Int64, nstart::Int64, routine::Function) where {T<:Real}
 ```
 
 Calculate the T-Matrix of the scatterer.
@@ -476,6 +506,7 @@ function calc_tmatrix!(
             Qsca += (2n + 1) * real(T0[n, n] * T0[n, n]' + T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]')
             Qext += (2n + 1) * real(T0[n, n] + T0[n + nmax, n + nmax])
         end
+        @debug "Qsca = $Qsca, Qext = $Qext"
         nngauss, nnmax = routine(ngauss, nmax, Qsca, Qext)
         if nnmax == -1
             break
@@ -500,8 +531,8 @@ end
 
 @doc raw"""
 ```
-calc_amplitude(scatterer::Scatterer, tmatrix::Union{Array{Float64,2},Nothing}, ϑ_i::Float64, φ_i::Float64, ϑ_s::Float64, φ_s::Float64)
-    ```
+calc_amplitude(scatterer::AbstractScatterer{T}, α::T, β::T, ϑ_i::T, φ_i::T, ϑ_s::T, φ_s::T, TT::Vector{<:AbstractMatrix}) where {T<:Real}
+```
 
 Calculate the amplitude matrix and the phase matrix, given the scatterer and the geometry of the incident and the scattered beam. Use pre-computed T-Matrix when possible.
 
@@ -513,7 +544,7 @@ Parameters:
 - `ϑ_s`: The zenith angle of the scattered beam.
 - `φ_i`: The azimuth angle of the indicent beam.
 - `φ_s`: The azimuth angle of the scatterer beam.
-- `tmatrix`: The pre-computed T-Matrix of the scatterer, or nothing if there is no pre-computation.
+- `TT`: The pre-computed T-Matrix of the scatterer.
 
 > All the angles here are input in degrees.
 """
@@ -525,7 +556,7 @@ function calc_amplitude(
     ϑ_s::T,
     φ_i::T,
     φ_s::T,
-    tmatrix::Union{Vector{<:AbstractMatrix},Nothing} = nothing,
+    TT::Vector{<:AbstractMatrix},
 ) where {T<:Real}
     # Validate the input angles
     @assert 0.0 <= α <= 360.0 &&
@@ -535,11 +566,7 @@ function calc_amplitude(
             0.0 <= φ_i <= 360.0 &&
             0.0 <= φ_s <= 360.0
 
-    if tmatrix === nothing
-        tmatrix = calc_tmatrix(scatterer)
-    end
-
-    nmax = length(tmatrix) - 1
+    nmax = length(TT) - 1
 
     α *= π / 180.0
     β *= π / 180.0
@@ -644,15 +671,15 @@ function calc_amplitude(
         dm = nmax - nm
         for nn in 1:nm
             for n in 1:nm
-                T11 = tmatrix[m + 1][n, nn]
-                T22 = tmatrix[m + 1][n + nm, nn + nm]
+                T11 = TT[m + 1][n, nn]
+                T22 = TT[m + 1][n + nm, nn + nm]
                 if m == 0
                     CN = CAL[n + dm, nn + dm] * dv2[n + dm] * dv02[nn + dm]
                     VV += CN * T22
                     HH += CN * T11
                 else
-                    T12 = tmatrix[m + 1][n, nn + nm]
-                    T21 = tmatrix[m + 1][n + nm, nn]
+                    T12 = TT[m + 1][n, nn + nm]
+                    T21 = TT[m + 1][n + nm, nn]
                     CN1 = CAL[n + dm, nn + dm] * fc
                     CN2 = CAL[n + dm, nn + dm] * fs
                     D11 = m^2 * dv1[n + dm] * dv01[nn + dm]
@@ -688,8 +715,15 @@ end
 calc_S = calc_amplitude
 
 @doc raw"""
+```
+calc_phase(S::AbstractMatrix)
+```
 
 Calculate the phase matrix using the given amplitude matrix $\mathbf{S}$.
+
+Parameters:
+
+- `S`, the precalculated amplitude matrix.
 """
 function calc_phase(S::AbstractMatrix)
     @assert size(S) == (2, 2)
@@ -715,8 +749,22 @@ function calc_phase(S::AbstractMatrix)
     return real.(Z)
 end
 
+@doc raw"""
+```
+calc_Z(S::AbstractMatrix)
+```
+
+Alias of `calc_phase`
+"""
 calc_Z = calc_phase
 
+@doc raw"""
+```
+calc_SZ(scatterer::AbstractScatterer{T}, α::T, β::T, ϑ_i::T, φ_i::T, ϑ_s::T, φ_s::T, TT::Vector{<:AbstractMatrix}) where {T<:Real}
+```
+
+Calculate the S matrix and the Z matrix sequentially.
+"""
 function calc_SZ(
     scatterer::AbstractScatterer,
     α::T,
@@ -725,7 +773,7 @@ function calc_SZ(
     ϑ_s::T,
     φ_i::T,
     φ_s::T,
-    TT::Union{Vector{<:AbstractMatrix},Nothing} = nothing,
+    TT::Vector{<:AbstractMatrix},
 ) where {T<:Real}
     S = calc_S(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, TT)
     Z = calc_Z(S)
@@ -733,6 +781,15 @@ function calc_SZ(
     return S, Z
 end
 
+@doc raw"""
+```
+hovenr(α₁, α₂, α₃, α₄, β₁, β₂)
+```
+
+Validate the expansion coefficients with the test of Van der Mee & Hovenier.
+
+Note that the index of the coefficients should start from $0$.
+"""
 function hovenr(α₁, α₂, α₃, α₄, β₁, β₂)
     valid = true
 
@@ -775,6 +832,21 @@ function hovenr(α₁, α₂, α₃, α₄, β₁, β₂)
     end
 end
 
+@doc raw"""
+```
+calc_expansion_coefficients(TT::Vector{<:AbstractMatrix}, Csca::Real, λ::Real)
+```
+
+Calculate the expansion coefficients from a given T-Matrix.
+
+Parameters:
+
+- `TT`: The precalculated T-Matrix of a scatterer.
+- `Csca`: The scattering cross setction.
+- `λ`: The wavelength.
+
+`Csca` and `λ` should have the same unit of length. E.g., if `λ` is in `μm`, `Csca` should be in `μm²`.
+"""
 function calc_expansion_coefficients(TT::Vector{<:AbstractMatrix}, Csca::Real, λ::Real)
     CT = eltype(TT[1])
     T = typeof(real(TT[1][1, 1]))
@@ -926,7 +998,27 @@ function calc_expansion_coefficients(TT::Vector{<:AbstractMatrix}, Csca::Real, �
     return α₁, α₂, α₃, α₄, β₁, β₂
 end
 
-function calc_scattering_matrix(α₁::AbstractVector{T}, α₂::AbstractVector{T}, α₃::AbstractVector{T}, α₄::AbstractVector{T}, β₁::AbstractVector{T}, β₂::AbstractVector{T}, Θ::Real) where {T<:Real}
+@doc raw"""
+```
+calc_scattering_matrix(α₁, α₂, α₃, α₄, β₁, β₂, Θ)
+```
+
+Calculate the scatterering matrix from the given expansion coefficients.
+
+Parameters:
+
+- `α₁`, `α₂`, `α₃`, `α₄`, `β₁`, `β₂`: The precalculated expansion coefficients.
+- `Θ`: The scattering angle in degrees.
+"""
+function calc_scattering_matrix(
+    α₁::AbstractVector{T},
+    α₂::AbstractVector{T},
+    α₃::AbstractVector{T},
+    α₄::AbstractVector{T},
+    β₁::AbstractVector{T},
+    β₂::AbstractVector{T},
+    Θ::Real,
+) where {T<:Real}
     lmax = length(α₁) - 1
     Θ = Float64(Θ) / 180 * π
 
@@ -980,7 +1072,7 @@ end
 calc_r!(scatterer::AbstractScatterer{T}, ngauss::Int64, x::AbstractArray{T}, w::AbstractArray{T}, r::AbstractArray{T}, dr::AbstractArray{T}) where {T<:Real}
 ```
 
-Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` points for a given scatterer.
+Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` points for a given scatterer, in place.
 """
 function calc_r!(
     scatterer::AbstractScatterer{T},
@@ -1314,6 +1406,7 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
     w = view(info.w, 1:ngss)
     r = view(info.r, 1:ngss)
     dr = view(info.dr, 1:ngss)
+    drr = dr ./ r
     kr1 = view(info.kr1, 1:ngss)
     kr_s1 = view(info.kr_s1, 1:ngss)
     wr2 = w .* r .* r
@@ -1337,38 +1430,22 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
     Threads.@threads for n2 in 1:nmax
         for n1 in 1:nmax
             for i in 1:ngss
+                τ₁τ₂ = τ[i, n1] * τ[i, n2]
+                d₁τ₂ = d[i, n1] * τ[i, n2]
+                d₂τ₁ = d[i, n2] * τ[i, n1]
+
                 if !(sym && (n1 + n2) % 2 == 1)
                     J12[n1, n2] +=
-                        wr2[i] *
-                        jkr_s[i, n2] *
-                        (
-                            dhkr[i, n1] * τ[i, n1] * τ[i, n2] +
-                            dr[i] / r[i] * an[n1] * hkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
-                        )
+                        wr2[i] * jkr_s[i, n2] * (dhkr[i, n1] * τ₁τ₂ + drr[i] * an[n1] * hkr[i, n1] * kr1[i] * d₁τ₂)
 
                     J21[n1, n2] +=
-                        wr2[i] *
-                        hkr[i, n1] *
-                        (
-                            djkr_s[i, n2] * τ[i, n1] * τ[i, n2] +
-                            dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
-                        )
+                        wr2[i] * hkr[i, n1] * (djkr_s[i, n2] * τ₁τ₂ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
 
                     RgJ12[n1, n2] +=
-                        wr2[i] *
-                        jkr_s[i, n2] *
-                        (
-                            djkr[i, n1] * τ[i, n1] * τ[i, n2] +
-                            dr[i] / r[i] * an[n1] * jkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
-                        )
+                        wr2[i] * jkr_s[i, n2] * (djkr[i, n1] * τ₁τ₂ + drr[i] * an[n1] * jkr[i, n1] * kr1[i] * d₁τ₂)
 
                     RgJ21[n1, n2] +=
-                        wr2[i] *
-                        jkr[i, n1] *
-                        (
-                            djkr_s[i, n2] * τ[i, n1] * τ[i, n2] +
-                            dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
-                        )
+                        wr2[i] * jkr[i, n1] * (djkr_s[i, n2] * τ₁τ₂ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
                 end
             end
         end
@@ -1436,6 +1513,7 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
     w = view(info.w, 1:ngss)
     r = view(info.r, 1:ngss)
     dr = view(info.dr, 1:ngss)
+    drr = dr ./ r
     kr1 = view(info.kr1, 1:ngss)
     kr_s1 = view(info.kr_s1, 1:ngss)
     wr2 = w .* r .* r
@@ -1477,69 +1555,52 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
         for n1 in mm:nmax
             for i in 1:ngss
                 if !(sym && (n1 + n2) % 2 == 0)
-                    OffsetJ11[n1, n2] +=
-                        wr2[i] * hkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
+                    pττp = p[i, n1] * τ[i, n2] + p[i, n2] * τ[i, n1]
+                    p₁d₂ = p[i, n1] * d[i, n2]
+
+                    OffsetJ11[n1, n2] += wr2[i] * hkr[i, n1] * jkr_s[i, n2] * pττp
 
                     OffsetJ22[n1, n2] +=
                         wr2[i] * (
-                            dhkr[i, n1] * djkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2]) +
-                            dr[i] / r[i] *
+                            dhkr[i, n1] * djkr_s[i, n2] * pττp +
+                            drr[i] *
                             (
                                 an[n1] * hkr[i, n1] * kr1[i] * djkr_s[i, n2] +
                                 an[n2] * jkr_s[i, n2] * kr_s1[i] * dhkr[i, n1]
                             ) *
-                            p[i, n1] *
-                            d[i, n2]
+                            p₁d₂
                         )
 
-                    OffsetRgJ11[n1, n2] +=
-                        wr2[i] * jkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
+                    OffsetRgJ11[n1, n2] += wr2[i] * jkr[i, n1] * jkr_s[i, n2] * pττp
 
                     OffsetRgJ22[n1, n2] +=
                         wr2[i] * (
-                            djkr[i, n1] * djkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2]) +
-                            dr[i] / r[i] *
+                            djkr[i, n1] * djkr_s[i, n2] * pττp +
+                            drr[i] *
                             (
                                 an[n1] * jkr[i, n1] * kr1[i] * djkr_s[i, n2] +
                                 an[n2] * jkr_s[i, n2] * kr_s1[i] * djkr[i, n1]
                             ) *
-                            p[i, n1] *
-                            d[i, n2]
+                            p₁d₂
                         )
                 end
 
                 if !(sym && (n1 + n2) % 2 == 1)
+                    ppττ = p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]
+                    d₁τ₂ = d[i, n1] * τ[i, n2]
+                    d₂τ₁ = d[i, n2] * τ[i, n1]
+
                     OffsetJ12[n1, n2] +=
-                        wr2[i] *
-                        jkr_s[i, n2] *
-                        (
-                            dhkr[i, n1] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
-                            dr[i] / r[i] * an[n1] * hkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
-                        )
+                        wr2[i] * jkr_s[i, n2] * (dhkr[i, n1] * ppττ + drr[i] * an[n1] * hkr[i, n1] * kr1[i] * d₁τ₂)
 
                     OffsetJ21[n1, n2] +=
-                        wr2[i] *
-                        hkr[i, n1] *
-                        (
-                            djkr_s[i, n2] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
-                            dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
-                        )
+                        wr2[i] * hkr[i, n1] * (djkr_s[i, n2] * ppττ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
 
                     OffsetRgJ12[n1, n2] +=
-                        wr2[i] *
-                        jkr_s[i, n2] *
-                        (
-                            djkr[i, n1] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
-                            dr[i] / r[i] * an[n1] * jkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
-                        )
+                        wr2[i] * jkr_s[i, n2] * (djkr[i, n1] * ppττ + drr[i] * an[n1] * jkr[i, n1] * kr1[i] * d₁τ₂)
 
                     OffsetRgJ21[n1, n2] +=
-                        wr2[i] *
-                        jkr[i, n1] *
-                        (
-                            djkr_s[i, n2] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
-                            dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
-                        )
+                        wr2[i] * jkr[i, n1] * (djkr_s[i, n2] * ppττ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
                 end
             end
         end
@@ -1615,6 +1676,7 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
     w = info.w
     r = info.r
     dr = info.dr
+    drr = dr ./ r
     kr1 = info.kr1
     kr_s1 = info.kr_s1
     wr2 = w .* r .* r
@@ -1634,38 +1696,22 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
     Threads.@threads for n2 in 1:nmax
         for n1 in 1:nmax
             for i in 1:ngss
+                τ₁τ₂ = τ[i, n1] * τ[i, n2]
+                d₁τ₂ = d[i, n1] * τ[i, n2]
+                d₂τ₁ = d[i, n2] * τ[i, n1]
+
                 if !(sym && (n1 + n2) % 2 == 1)
                     J12[n1, n2] +=
-                        wr2[i] *
-                        jkr_s[i, n2] *
-                        (
-                            dhkr[i, n1] * τ[i, n1] * τ[i, n2] +
-                            dr[i] / r[i] * an[n1] * hkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
-                        )
+                        wr2[i] * jkr_s[i, n2] * (dhkr[i, n1] * τ₁τ₂ + drr[i] * an[n1] * hkr[i, n1] * kr1[i] * d₁τ₂)
 
                     J21[n1, n2] +=
-                        wr2[i] *
-                        hkr[i, n1] *
-                        (
-                            djkr_s[i, n2] * τ[i, n1] * τ[i, n2] +
-                            dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
-                        )
+                        wr2[i] * hkr[i, n1] * (djkr_s[i, n2] * τ₁τ₂ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
 
                     RgJ12[n1, n2] +=
-                        wr2[i] *
-                        jkr_s[i, n2] *
-                        (
-                            djkr[i, n1] * τ[i, n1] * τ[i, n2] +
-                            dr[i] / r[i] * an[n1] * jkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
-                        )
+                        wr2[i] * jkr_s[i, n2] * (djkr[i, n1] * τ₁τ₂ + drr[i] * an[n1] * jkr[i, n1] * kr1[i] * d₁τ₂)
 
                     RgJ21[n1, n2] +=
-                        wr2[i] *
-                        jkr[i, n1] *
-                        (
-                            djkr_s[i, n2] * τ[i, n1] * τ[i, n2] +
-                            dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
-                        )
+                        wr2[i] * jkr[i, n1] * (djkr_s[i, n2] * τ₁τ₂ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
                 end
             end
         end
@@ -1713,8 +1759,8 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
         T0 = -RgQ * approx_inv(Q)
     else
         T0 = -RgQ * inv(Q)
-        @debug "Accuracy of Q is $(minimum([Arblib.rel_accuracy_bits(real(x)) for x in Q]))"
-        @debug "Accuracy of T is $(minimum([Arblib.rel_accuracy_bits(real(x)) for x in T0]))"
+        @debug "Accuracy of Q is $(rel_accuracy_bits(Q))"
+        @debug "Accuracy of T is $(rel_accuracy_bits(T0))"
     end
 
     return T0, Q, RgQ
@@ -1749,6 +1795,7 @@ function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax
     w = info.w
     r = info.r
     dr = info.dr
+    drr = dr ./ r
     kr1 = info.kr1
     kr_s1 = info.kr_s1
     wr2 = w .* r .* r
@@ -1776,67 +1823,52 @@ function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax
             nn1 = n1 - mm + 1
             for i in 1:ngss
                 if !(sym && (n1 + n2) % 2 == 0)
-                    J11[nn1, nn2] += wr2[i] * hkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
+                    pττp = p[i, n1] * τ[i, n2] + p[i, n2] * τ[i, n1]
+                    p₁d₂ = p[i, n1] * d[i, n2]
+
+                    J11[nn1, nn2] += wr2[i] * hkr[i, n1] * jkr_s[i, n2] * pττp
 
                     J22[nn1, nn2] +=
                         wr2[i] * (
-                            dhkr[i, n1] * djkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2]) +
-                            dr[i] / r[i] *
+                            dhkr[i, n1] * djkr_s[i, n2] * pττp +
+                            drr[i] *
                             (
                                 an[n1] * hkr[i, n1] * kr1[i] * djkr_s[i, n2] +
                                 an[n2] * jkr_s[i, n2] * kr_s1[i] * dhkr[i, n1]
                             ) *
-                            p[i, n1] *
-                            d[i, n2]
+                            p₁d₂
                         )
 
-                    RgJ11[nn1, nn2] += wr2[i] * jkr[i, n1] * jkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2])
+                    RgJ11[nn1, nn2] += wr2[i] * jkr[i, n1] * jkr_s[i, n2] * pττp
 
                     RgJ22[nn1, nn2] +=
                         wr2[i] * (
-                            djkr[i, n1] * djkr_s[i, n2] * (p[i, n1] * τ[i, n2] + τ[i, n1] * p[i, n2]) +
-                            dr[i] / r[i] *
+                            djkr[i, n1] * djkr_s[i, n2] * pττp +
+                            drr[i] *
                             (
                                 an[n1] * jkr[i, n1] * kr1[i] * djkr_s[i, n2] +
                                 an[n2] * jkr_s[i, n2] * kr_s1[i] * djkr[i, n1]
                             ) *
-                            p[i, n1] *
-                            d[i, n2]
+                            p₁d₂
                         )
                 end
 
                 if !(sym && (n1 + n2) % 2 == 1)
+                    ppττ = p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]
+                    d₁τ₂ = d[i, n1] * τ[i, n2]
+                    d₂τ₁ = d[i, n2] * τ[i, n1]
+
                     J12[nn1, nn2] +=
-                        wr2[i] *
-                        jkr_s[i, n2] *
-                        (
-                            dhkr[i, n1] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
-                            dr[i] / r[i] * an[n1] * hkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
-                        )
+                        wr2[i] * jkr_s[i, n2] * (dhkr[i, n1] * ppττ + drr[i] * an[n1] * hkr[i, n1] * kr1[i] * d₁τ₂)
 
                     J21[nn1, nn2] +=
-                        wr2[i] *
-                        hkr[i, n1] *
-                        (
-                            djkr_s[i, n2] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
-                            dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
-                        )
+                        wr2[i] * hkr[i, n1] * (djkr_s[i, n2] * ppττ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
 
                     RgJ12[nn1, nn2] +=
-                        wr2[i] *
-                        jkr_s[i, n2] *
-                        (
-                            djkr[i, n1] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
-                            dr[i] / r[i] * an[n1] * jkr[i, n1] * kr1[i] * d[i, n1] * τ[i, n2]
-                        )
+                        wr2[i] * jkr_s[i, n2] * (djkr[i, n1] * ppττ + drr[i] * an[n1] * jkr[i, n1] * kr1[i] * d₁τ₂)
 
                     RgJ21[nn1, nn2] +=
-                        wr2[i] *
-                        jkr[i, n1] *
-                        (
-                            djkr_s[i, n2] * (p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]) +
-                            dr[i] / r[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d[i, n2] * τ[i, n1]
-                        )
+                        wr2[i] * jkr[i, n1] * (djkr_s[i, n2] * ppττ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
                 end
             end
         end
@@ -1909,8 +1941,8 @@ function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax
         Tm = -RgQ * approx_inv(Q)
     else
         Tm = -RgQ * inv(Q)
-        @debug "Accuracy of Q is $(minimum([Arblib.rel_accuracy_bits(real(x)) for x in Q]))"
-        @debug "Accuracy of T is $(minimum([Arblib.rel_accuracy_bits(real(x)) for x in Tm]))"
+        @debug "Accuracy of Q is $(rel_accuracy_bits(Q))"
+        @debug "Accuracy of T is $(rel_accuracy_bits(Tm))"
     end
 
     return Tm, Q, RgQ
