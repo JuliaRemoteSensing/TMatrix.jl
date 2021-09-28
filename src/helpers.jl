@@ -1,4 +1,4 @@
-function vig!(nmax::Int64, m::Int64, x::T, dv1::AbstractArray, dv2::AbstractArray) where {T<:Real}
+function vig!(nmax::Int64, m::Int64, x::T, dv1::AbstractArray{T}, dv2::AbstractArray{T}) where {T<:Real}
     if x < -1 || x > 1 || abs(1.0 - abs(x)) < eps(x)
         error("Constraint violated: x ∈ (-1, 1)")
     end
@@ -11,6 +11,8 @@ function vig!(nmax::Int64, m::Int64, x::T, dv1::AbstractArray, dv2::AbstractArra
         error("Constraint violated: nmax >= 1")
     end
 
+    NRT = nonref(x)
+
     a = one(x)
     qs = √(one(x) - x * x)
     qs1 = one(x) / qs
@@ -18,7 +20,7 @@ function vig!(nmax::Int64, m::Int64, x::T, dv1::AbstractArray, dv2::AbstractArra
         d1 = one(x)
         d2 = x
         for i in 1:nmax
-            d3 = (T(2i + 1) * x * d2 - i * d1) / (i + 1)
+            d3 = (NRT(2i + 1) * x * d2 - i * d1) / (i + 1)
             der = qs1 * i * (i + 1) / (2i + 1) * (d3 - d1)
             dv1[i] = d2
             dv2[i] = der
@@ -26,13 +28,13 @@ function vig!(nmax::Int64, m::Int64, x::T, dv1::AbstractArray, dv2::AbstractArra
         end
     else
         for i in 1:m
-            a *= √T((2i - 1) // 2i) * qs
+            a *= √NRT((2i - 1) // 2i) * qs
         end
         d1 = zero(x)
         d2 = a
         for i in m:nmax
-            qnm = √T(i^2 - m^2)
-            qnm1 = √T((i + 1)^2 - m^2)
+            qnm = √NRT(i^2 - m^2)
+            qnm1 = √NRT((i + 1)^2 - m^2)
             d3 = ((2i + 1) * x * d2 - qnm * d1) / qnm1
             der = qs1 * (-(i + 1) * qnm * d1 + i * qnm1 * d3) / (2i + 1)
             dv1[i] = d2
@@ -110,19 +112,26 @@ end
 
 @doc raw"""
 ```
-sphericalbesselj!(x::T, nmax::Int64, y::AbstractArray{T}, u::AbstractArray{T}) where {T <: Union{Arb, Acb}}
+sphericalbesselj!(x::T, nmax::Int64, y::AbstractArray{T}, u::AbstractArray{T}) where {T<:Union{Arblib.ArbLike, Arblib.AcbLike}}
 ```
 
 For `Arb` and `Acb`, use `Arblib.hypegeom_bessel_j!` instead.
 """
-function sphericalbesselj!(x::T, nmax::Int64, jkr::AbstractArray{T}, djkr::AbstractArray{T}) where {T<:Union{Arb,Acb}}
+function sphericalbesselj!(
+    x::T,
+    nmax::Int64,
+    jkr::AbstractArray{T},
+    djkr::AbstractArray{T},
+) where {T<:Union{Arblib.ArbLike,Arblib.AcbLike}}
+    NRT = nonref(x)
+
     x1 = 1 / x
     y0 = zero(x)
-    half = T(1 // 2)
-    coeff = √(T(π) / 2x)
+    half = NRT(1 // 2)
+    coeff = √(NRT(π) / 2x)
     Arblib.hypgeom_bessel_j!(y0, half, x)
     for i in 1:nmax
-        jkr[i] = Arblib.hypgeom_bessel_j!(jkr[i], T(i) + half, x)
+        jkr[i] = Arblib.hypgeom_bessel_j!(jkr[i], i + half, x)
     end
 
     djkr[1] = y0 - x1 * jkr[1]
@@ -159,19 +168,26 @@ end
 
 @doc raw"""
 ```
-sphericalbessely!(x::T, nmax::Int64, y::AbstractArray{T}, u::AbstractArray{T}) where {T <: Union{Arb, Acb}}
+sphericalbessely!(x::T, nmax::Int64, y::AbstractArray{T}, u::AbstractArray{T}) where {T<:Union{Arblib.ArbLike, Arblib.AcbLike}}
 ```
 
 For `Arb` and `Acb`, use `Arblib.hypegeom_bessel_y!` instead.
 """
-function sphericalbessely!(x::T, nmax::Int64, ykr::AbstractArray{T}, dykr::AbstractArray{T}) where {T<:Union{Arb,Acb}}
+function sphericalbessely!(
+    x::T,
+    nmax::Int64,
+    ykr::AbstractArray{T},
+    dykr::AbstractArray{T},
+) where {T<:Union{Arblib.ArbLike,Arblib.AcbLike}}
+    NRT = nonref(x)
+
     x1 = 1 / x
     y0 = zero(x)
-    half = T(1 // 2)
-    coeff = √(T(π) / 2x)
+    half = NRT(1 // 2)
+    coeff = √(NRT(π) / 2x)
     Arblib.hypgeom_bessel_y!(y0, half, x)
     for i in 1:nmax
-        ykr[i] = Arblib.hypgeom_bessel_y!(ykr[i], T(i) + half, x)
+        ykr[i] = Arblib.hypgeom_bessel_y!(ykr[i], i + half, x)
     end
 
     dykr[1] = y0 - x1 * ykr[1]
