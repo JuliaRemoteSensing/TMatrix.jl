@@ -60,10 +60,7 @@ setprecision(Arb, 128)
             end
         end
 
-        # FIXME: Currently, we have to use larger ndgs for cylinders so that Arb can converge.
         @testset "for cylinders with d_to_h = $d_to_h" for d_to_h in [1 // 2, 1, 2]
-            local ndgs = 16
-
             @test begin
                 scatterer = TMatrix.Scatterer(
                     r = rev,

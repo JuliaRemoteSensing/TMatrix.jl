@@ -455,7 +455,7 @@ function tmatrix_routine_mishchenko(
             if Δ < ddelta
                 @debug "[mishchenko] nmax convergence reached"
                 nmax_convergence = true
-                return ngauss + ndgs, nmax
+                return ngauss + 2, nmax
             else
                 return ngauss + ndgs, nmax + 1
             end
@@ -465,7 +465,7 @@ function tmatrix_routine_mishchenko(
                 @debug "[mishchenko] ngauss convergence reached"
                 return -1, -1
             else
-                return ngauss + ndgs, nmax
+                return ngauss + 2, nmax
             end
         end
     end

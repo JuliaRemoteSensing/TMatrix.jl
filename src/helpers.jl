@@ -265,29 +265,36 @@ gausslegendre(::Type{Float64}, n::Integer) = FastGaussQuadrature.gausslegendre(n
 
 function gausslegendre(T::Type{<:Real}, n::Integer)
     prec = precision(T)
-    x = ArbVector(n; prec = prec)
-    w = ArbVector(n; prec = prec)
+    x = ArbRefVector(n; prec = prec)
+    w = ArbRefVector(n; prec = prec)
+
     for i in 1:(n ÷ 2)
-        Arblib.hypgeom_legendre_p_ui_root!(ref(x, i), ref(w, i), UInt64(n), UInt64(i - 1); prec = prec)
-    end
-    for i in (n - n ÷ 2 + 1):n
-        x[i] = -ref(x, n + 1 - i)
-        w[i] = ref(w, n + 1 - i)
+        Arblib.hypgeom_legendre_p_ui_root!(x[n + 1 - i], w[n + 1 - i], UInt64(n), UInt64(i - 1); prec = prec)
+        x[i] = -x[n + 1 - i]
+        w[i] = w[n + 1 - i]
     end
 
-    return [T(ref(x, i)) for i in 1:n], [T(ref(w, i)) for i in 1:n]
+    if n % 2 == 1
+        Arblib.hypgeom_legendre_p_ui_root!(x[n ÷ 2 + 1], w[n ÷ 2 + 1], UInt64(n), UInt64(n ÷ 2); prec = prec)
+    end
+
+    return [T(x[i]) for i in 1:n], [T(w[i]) for i in 1:n]
 end
 
 function gausslegendre(::Type{<:Union{Arb,ArbRef}}, n::Integer)
-    x = ArbVector(n)
-    w = ArbVector(n)
+    x = ArbRefVector(n)
+    w = ArbRefVector(n)
+
     for i in 1:(n ÷ 2)
-        Arblib.hypgeom_legendre_p_ui_root!(ref(x, i), ref(w, i), UInt64(n), UInt64(i - 1))
+        Arblib.hypgeom_legendre_p_ui_root!(x[n + 1 - i], w[n + 1 - i], UInt64(n), UInt64(i - 1))
+        x[i] = -x[n + 1 - i]
+        w[i] = w[n + 1 - i]
     end
-    for i in (n - n ÷ 2 + 1):n
-        x[i] = -ref(x, n + 1 - i)
-        w[i] = ref(w, n + 1 - i)
+
+    if n % 2 == 1
+        Arblib.hypgeom_legendre_p_ui_root!(x[n ÷ 2 + 1], w[n ÷ 2 + 1], UInt64(n), UInt64(n ÷ 2))
     end
+
     return x, w
 end
 
