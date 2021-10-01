@@ -558,7 +558,7 @@ function calc_tmatrix(
     T21 = complex.(RT21, IT21)
     T22 = complex.(RT22, IT22)
 
-    T = []
+    T = DenseMatrix{ComplexF64}[]
     for mm in 0:nmax
         m1 = nmax - max(0, mm - 1)
         Tmm = zeros(ComplexF64, 2m1, 2m1)

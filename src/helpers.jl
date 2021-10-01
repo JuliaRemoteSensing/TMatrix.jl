@@ -1,3 +1,58 @@
+function calc_an(T::Type{<:Real}, nmax::Int64)
+    an = zeros(T, nmax)
+    for n in 1:nmax
+        an[n] = n * (n + 1)
+    end
+    return an
+end
+
+function calc_an(T::Type{<:Arblib.ArbLike}, nmax::Int64)
+    an = ArbRefVector(nmax)
+    for n in 1:nmax
+        an[n] = n * (n + 1)
+    end
+    return an
+end
+
+function calc_ann(T::Type{<:Real}, nmax::Int64)
+    ann = zeros(T, nmax, nmax)
+    for n1 in 1:nmax
+        for n2 in 1:nmax
+            ann[n1, n2] = √T((2n1 + 1) * (2n2 + 1) // (n1 * (n1 + 1) * n2 * (n2 + 1))) / 2
+        end
+    end
+    return ann
+end
+
+function calc_ann(T::Type{<:Arblib.ArbLike}, nmax::Int64)
+    ann = ArbRefMatrix(nmax, nmax)
+    half = Arb(1 // 2)
+    for n1 in 1:nmax
+        for n2 in 1:nmax
+            ann[n1, n2] = (2n1 + 1) * (2n2 + 1) // (n1 * (n1 + 1) * n2 * (n2 + 1))
+            Arblib.sqrt!(ann[n1, n2], ann[n1, n2])
+            Arblib.mul!(ann[n1, n2], ann[n1, n2], half)
+        end
+    end
+    return ann
+end
+
+function calc_sig(T::Type{<:Real}, nmax::Int64)
+    sig = zeros(T, nmax)
+    for n in 1:nmax
+        sig[n] = 1 - 2 * (n % 2)
+    end
+    return sig
+end
+
+function calc_sig(T::Type{<:Arblib.ArbLike}, nmax::Int64)
+    sig = ArbRefVector(nmax)
+    for n in 1:nmax
+        sig[n] = 1 - 2 * (n % 2)
+    end
+    return sig
+end
+
 function vig!(nmax::Int64, m::Int64, x::T, dv1::AbstractArray{T}, dv2::AbstractArray{T}) where {T<:Real}
     if x < -1 || x > 1 || abs(1.0 - abs(x)) < eps(x)
         error("Constraint violated: x ∈ (-1, 1)")
@@ -110,41 +165,6 @@ function sphericalbesselj!(
     return
 end
 
-@doc raw"""
-```
-sphericalbesselj!(x::T, nmax::Int64, y::AbstractArray{T}, u::AbstractArray{T}) where {T<:Union{Arblib.ArbLike, Arblib.AcbLike}}
-```
-
-For `Arb` and `Acb`, use `Arblib.hypegeom_bessel_j!` instead.
-"""
-function sphericalbesselj!(
-    x::T,
-    nmax::Int64,
-    jkr::AbstractArray{T},
-    djkr::AbstractArray{T},
-) where {T<:Union{Arblib.ArbLike,Arblib.AcbLike}}
-    NRT = nonref(x)
-
-    x1 = 1 / x
-    y0 = zero(x)
-    half = NRT(1 // 2)
-    coeff = √(NRT(π) / 2x)
-    Arblib.hypgeom_bessel_j!(y0, half, x)
-    for i in 1:nmax
-        jkr[i] = Arblib.hypgeom_bessel_j!(jkr[i], i + half, x)
-    end
-
-    djkr[1] = y0 - x1 * jkr[1]
-    for n in 2:nmax
-        djkr[n] = jkr[n - 1] - n * x1 * jkr[n]
-    end
-
-    jkr .*= coeff
-    djkr .*= coeff
-
-    return
-end
-
 function sphericalbesselj(x::T, nmax::Int64, nnmax1::Int64) where {T<:Number}
     y = zeros(T, nmax)
     u = zeros(T, nmax)
@@ -166,41 +186,6 @@ function sphericalbessely!(x::T, nmax::Int64, y::AbstractArray{T}, v::AbstractAr
     end
 end
 
-@doc raw"""
-```
-sphericalbessely!(x::T, nmax::Int64, y::AbstractArray{T}, u::AbstractArray{T}) where {T<:Union{Arblib.ArbLike, Arblib.AcbLike}}
-```
-
-For `Arb` and `Acb`, use `Arblib.hypegeom_bessel_y!` instead.
-"""
-function sphericalbessely!(
-    x::T,
-    nmax::Int64,
-    ykr::AbstractArray{T},
-    dykr::AbstractArray{T},
-) where {T<:Union{Arblib.ArbLike,Arblib.AcbLike}}
-    NRT = nonref(x)
-
-    x1 = 1 / x
-    y0 = zero(x)
-    half = NRT(1 // 2)
-    coeff = √(NRT(π) / 2x)
-    Arblib.hypgeom_bessel_y!(y0, half, x)
-    for i in 1:nmax
-        ykr[i] = Arblib.hypgeom_bessel_y!(ykr[i], i + half, x)
-    end
-
-    dykr[1] = y0 - x1 * ykr[1]
-    for n in 2:nmax
-        dykr[n] = ykr[n - 1] - n * x1 * ykr[n]
-    end
-
-    ykr .*= coeff
-    dykr .*= coeff
-
-    return
-end
-
 function sphericalbessely(x::T, nmax::Int64) where {T<:Number}
     y = zeros(T, nmax)
     v = zeros(T, nmax)
@@ -208,7 +193,7 @@ function sphericalbessely(x::T, nmax::Int64) where {T<:Number}
     return y, v
 end
 
-function cross_section(TT::Vector{<:AbstractMatrix{CT}}, λ::T) where {T<:Real,CT<:Number}
+function cross_section(TT::Vector{<:AbstractMatrix}, λ::Real)
     nmax = length(TT) - 1
 
     Qsca = zero(λ)
@@ -281,10 +266,16 @@ function gausslegendre(T::Type{<:Real}, n::Integer)
     return [T(x[i]) for i in 1:n], [T(w[i]) for i in 1:n]
 end
 
-function gausslegendre(::Type{<:Union{Arb,ArbRef}}, n::Integer)
+function gausslegendre(T::Type{<:Union{Arb,ArbRef}}, n::Integer)
     x = ArbRefVector(n)
     w = ArbRefVector(n)
 
+    gausslegendre!(T, n, x, w)
+
+    return x, w
+end
+
+function gausslegendre!(::Type{<:Union{Arb,ArbRef}}, n::Integer, x::Arblib.ArbVectorLike, w::Arblib.ArbVectorLike)
     for i in 1:(n ÷ 2)
         Arblib.hypgeom_legendre_p_ui_root!(x[n + 1 - i], w[n + 1 - i], UInt64(n), UInt64(i - 1))
         x[i] = -x[n + 1 - i]
@@ -294,8 +285,6 @@ function gausslegendre(::Type{<:Union{Arb,ArbRef}}, n::Integer)
     if n % 2 == 1
         Arblib.hypgeom_legendre_p_ui_root!(x[n ÷ 2 + 1], w[n ÷ 2 + 1], UInt64(n), UInt64(n ÷ 2))
     end
-
-    return x, w
 end
 
 function ccg(T::Type{<:Real}, n::Int64, n1::Int64, nmax::Int64, k1::Int64, k2::Int64)
