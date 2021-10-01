@@ -229,22 +229,22 @@ function vary(
     blk_len = NPNG2 * NPN1 * 8
     jkr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr), (NPNG2, NPN1))[1:ngauss, 1:nmax]
     ykr = unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len), (NPNG2, NPN1))[1:ngauss, 1:nmax]
-    jkr_sr =
+    jkₛrr =
         unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len * 2), (NPNG2, NPN1))[1:ngauss, 1:nmax]
-    jkr_si =
+    jkₛri =
         unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len * 3), (NPNG2, NPN1))[1:ngauss, 1:nmax]
     djkr =
         unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len * 4), (NPNG2, NPN1))[1:ngauss, 1:nmax]
     dykr =
         unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len * 5), (NPNG2, NPN1))[1:ngauss, 1:nmax]
-    djkr_sr =
+    djkₛrr =
         unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len * 6), (NPNG2, NPN1))[1:ngauss, 1:nmax]
-    djkr_si =
+    djkₛri =
         unsafe_wrap(Array{Float64,2}, convert(Ptr{Float64}, cbess_ptr + blk_len * 7), (NPNG2, NPN1))[1:ngauss, 1:nmax]
-    jkr_s = complex.(jkr_sr, jkr_si)
-    djkr_s = complex.(djkr_sr, djkr_si)
+    jkₛr = complex.(jkₛrr, jkₛri)
+    djkₛr = complex.(djkₛrr, djkₛri)
 
-    return ppi, pir, pii, r, dr, ddr, drr, dri, jkr, djkr, ykr, dykr, jkr_s, djkr_s
+    return ppi, pir, pii, r, dr, ddr, drr, dri, jkr, djkr, ykr, dykr, jkₛr, djkₛr
 end
 
 function vig(nmax::Int64, m::Int64, x::Float64)

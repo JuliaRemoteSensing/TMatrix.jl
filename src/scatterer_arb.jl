@@ -193,7 +193,7 @@ function update!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
         info.sig = calc_sig(Arb, nmax)
     end
 
-    # Need to recalculate `x`, `w`, `s`, `r`, `dr`, `kr1` and `kr_s1` if `ngauss` changes.
+    # Need to recalculate `x`, `w`, `s`, `r`, `dr`, `kr⁻¹` and `kₛr⁻¹` if `ngauss` changes.
     k = 2 * Arb(π) / scatterer.λ
 
     if ngauss != info.ngauss
@@ -203,32 +203,32 @@ function update!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
         info.r = ArbRefVector(ngauss)
         info.dr = ArbRefVector(ngauss)
         info.drr = ArbRefVector(ngauss)
-        info.wr2 = ArbRefVector(ngauss)
-        info.kr1 = ArbRefVector(ngauss)
-        info.kr_s1 = AcbRefVector(ngauss)
+        info.wr² = ArbRefVector(ngauss)
+        info.kr⁻¹ = ArbRefVector(ngauss)
+        info.kₛr⁻¹ = AcbRefVector(ngauss)
 
         calc_r!(scatterer, ngauss, info.x, info.w, info.r, info.dr)
     end
 
     kr = ArbRefVector(ngauss)
     Arblib.mul!(kr, info.r, k)
-    kr_s = AcbRefVector(ngauss)
-    Arblib.mul!(kr_s, AcbRefVector(kr), scatterer.m)
+    kₛr = AcbRefVector(ngauss)
+    Arblib.mul!(kₛr, AcbRefVector(kr), scatterer.m)
 
     if ngauss != info.ngauss
         for i in 1:ngauss
             Arblib.div!(info.drr[i], info.dr[i], info.r[i])
 
-            Arblib.sqr!(info.wr2[i], info.r[i])
-            Arblib.mul!(info.wr2[i], info.wr2[i], info.w[i])
+            Arblib.sqr!(info.wr²[i], info.r[i])
+            Arblib.mul!(info.wr²[i], info.wr²[i], info.w[i])
 
             info.s[i] = info.x[i]
             Arblib.acos!(info.s[i], info.s[i])
             Arblib.sin!(info.s[i], info.s[i])
             Arblib.div!(info.s[i], ARB_ONE, info.s[i])
 
-            Arblib.div!(info.kr1[i], ARB_ONE, kr[i])
-            Arblib.div!(info.kr_s1[i], ACB_ONE, kr_s[i])
+            Arblib.div!(info.kr⁻¹[i], ARB_ONE, kr[i])
+            Arblib.div!(info.kₛr⁻¹[i], ACB_ONE, kₛr[i])
         end
     end
 
@@ -240,12 +240,12 @@ function update!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
     info.dykr = ArbRefMatrix(ngauss, nmax)
     info.hkr = AcbRefMatrix(ngauss, nmax)
     info.dhkr = AcbRefMatrix(ngauss, nmax)
-    info.jkr_s = AcbRefMatrix(ngauss, nmax)
-    info.djkr_s = AcbRefMatrix(ngauss, nmax)
+    info.jkₛr = AcbRefMatrix(ngauss, nmax)
+    info.djkₛr = AcbRefMatrix(ngauss, nmax)
 
     Threads.@threads for i in 1:ngauss
-        x1 = info.kr1[i]
-        x_s1 = info.kr_s1[i]
+        x1 = info.kr⁻¹[i]
+        x_s1 = info.kₛr⁻¹[i]
         j0 = Arb(0)
         y0 = Arb(0)
         j_s0 = Acb(0)
@@ -253,20 +253,20 @@ function update!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
         cc = √(x_s1 * π / 2)
 
         Arblib.hypgeom_bessel_jy!(j0, y0, ARB_HALF, kr[i])
-        Arblib.hypgeom_bessel_j!(j_s0, ACB_HALF, kr_s[i])
+        Arblib.hypgeom_bessel_j!(j_s0, ACB_HALF, kₛr[i])
 
         for n in 1:nmax
             Arblib.hypgeom_bessel_jy!(info.jkr[i, n], info.ykr[i, n], ARB_HALF + n, kr[i])
-            Arblib.hypgeom_bessel_j!(info.jkr_s[i, n], ACB_HALF + n, kr_s[i])
+            Arblib.hypgeom_bessel_j!(info.jkₛr[i, n], ACB_HALF + n, kₛr[i])
         end
 
         info.djkr[i, 1] = j0 - x1 * info.jkr[i, 1]
         info.dykr[i, 1] = y0 - x1 * info.ykr[i, 1]
-        info.djkr_s[i, 1] = j_s0 - x_s1 * info.jkr_s[i, 1]
+        info.djkₛr[i, 1] = j_s0 - x_s1 * info.jkₛr[i, 1]
         for n in 2:nmax
             info.djkr[i, n] = info.jkr[i, n - 1] - n * x1 * info.jkr[i, n]
             info.dykr[i, n] = info.ykr[i, n - 1] - n * x1 * info.ykr[i, n]
-            info.djkr_s[i, n] = info.jkr_s[i, n - 1] - n * x_s1 * info.jkr_s[i, n]
+            info.djkₛr[i, n] = info.jkₛr[i, n - 1] - n * x_s1 * info.jkₛr[i, n]
         end
 
         for n in 1:nmax
@@ -274,8 +274,8 @@ function update!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
             info.djkr[i, n] *= cr
             info.ykr[i, n] *= cr
             info.dykr[i, n] *= cr
-            info.jkr_s[i, n] *= cc
-            info.djkr_s[i, n] *= cc
+            info.jkₛr[i, n] *= cc
+            info.djkₛr[i, n] *= cc
         end
 
         for n in 1:nmax
@@ -313,87 +313,87 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
 
     ngss = sym ? (ngauss ÷ 2) : ngauss
     drr = info.drr
-    kr1 = info.kr1
-    kr_s1 = info.kr_s1
-    wr2 = info.wr2
+    kr⁻¹ = info.kr⁻¹
+    kₛr⁻¹ = info.kₛr⁻¹
+    wr² = info.wr²
 
     jkr = info.jkr
     djkr = info.djkr
     hkr = info.hkr
     dhkr = info.dhkr
-    jkr_s = info.jkr_s
-    djkr_s = info.djkr_s
+    jkₛr = info.jkₛr
+    djkₛr = info.djkₛr
 
-    J12 = AcbRefMatrix(nmax, nmax)
-    J21 = AcbRefMatrix(nmax, nmax)
-    RgJ12 = AcbRefMatrix(nmax, nmax)
-    RgJ21 = AcbRefMatrix(nmax, nmax)
+    J₁₂ = AcbRefMatrix(nmax, nmax)
+    J₂₁ = AcbRefMatrix(nmax, nmax)
+    RgJ₁₂ = AcbRefMatrix(nmax, nmax)
+    RgJ₂₁ = AcbRefMatrix(nmax, nmax)
 
     Threads.@threads for nn in 0:(nmax * nmax - 1)
-        n2 = nn ÷ nmax + 1
-        n1 = nn % nmax + 1
+        n₂ = nn ÷ nmax + 1
+        n₁ = nn % nmax + 1
         for i in 1:ngss
-            τ₁τ₂ = τ[i][n1] * τ[i][n2]
-            d₁τ₂ = d[i][n1] * τ[i][n2]
-            d₂τ₁ = d[i][n2] * τ[i][n1]
+            τ₁τ₂ = τ[i][n₁] * τ[i][n₂]
+            d₁τ₂ = d[i][n₁] * τ[i][n₂]
+            d₂τ₁ = d[i][n₂] * τ[i][n₁]
 
-            if !(sym && (n1 + n2) % 2 == 1)
-                J12[n1, n2] +=
-                    wr2[i] * jkr_s[i, n2] * (dhkr[i, n1] * τ₁τ₂ + drr[i] * an[n1] * hkr[i, n1] * kr1[i] * d₁τ₂)
+            if !(sym && (n₁ + n₂) % 2 == 1)
+                J₁₂[n₁, n₂] +=
+                    wr²[i] * jkₛr[i, n₂] * (dhkr[i, n₁] * τ₁τ₂ + drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                J21[n1, n2] +=
-                    wr2[i] * hkr[i, n1] * (djkr_s[i, n2] * τ₁τ₂ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
+                J₂₁[n₁, n₂] +=
+                    wr²[i] * hkr[i, n₁] * (djkₛr[i, n₂] * τ₁τ₂ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
 
-                RgJ12[n1, n2] +=
-                    wr2[i] * jkr_s[i, n2] * (djkr[i, n1] * τ₁τ₂ + drr[i] * an[n1] * jkr[i, n1] * kr1[i] * d₁τ₂)
+                RgJ₁₂[n₁, n₂] +=
+                    wr²[i] * jkₛr[i, n₂] * (djkr[i, n₁] * τ₁τ₂ + drr[i] * an[n₁] * jkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                RgJ21[n1, n2] +=
-                    wr2[i] * jkr[i, n1] * (djkr_s[i, n2] * τ₁τ₂ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
+                RgJ₂₁[n₁, n₂] +=
+                    wr²[i] * jkr[i, n₁] * (djkₛr[i, n₂] * τ₁τ₂ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
             end
         end
     end
 
-    J12 .*= -1.0im * ann
-    J21 .*= 1.0im * ann
+    J₁₂ .*= -1.0im * ann
+    J₂₁ .*= 1.0im * ann
 
-    RgJ12 .*= -1.0im * ann
-    RgJ21 .*= 1.0im * ann
+    RgJ₁₂ .*= -1.0im * ann
+    RgJ₂₁ .*= 1.0im * ann
 
     k = 2 * Arb(π) / scatterer.λ
-    k_s = k * scatterer.m
-    kk = Acb(k^2)
-    kk_s = k * k_s
+    kₛ = k * scatterer.m
+    k² = Acb(k^2)
+    kkₛ = k * kₛ
 
-    Q11 = AcbRefMatrix(nmax, nmax)
-    Q12 = AcbRefMatrix(nmax, nmax)
-    Q21 = AcbRefMatrix(nmax, nmax)
-    Q22 = AcbRefMatrix(nmax, nmax)
-    RgQ11 = AcbRefMatrix(nmax, nmax)
-    RgQ12 = AcbRefMatrix(nmax, nmax)
-    RgQ21 = AcbRefMatrix(nmax, nmax)
-    RgQ22 = AcbRefMatrix(nmax, nmax)
+    Q₁₁ = AcbRefMatrix(nmax, nmax)
+    Q₁₂ = AcbRefMatrix(nmax, nmax)
+    Q₂₁ = AcbRefMatrix(nmax, nmax)
+    Q₂₂ = AcbRefMatrix(nmax, nmax)
+    RgQ₁₁ = AcbRefMatrix(nmax, nmax)
+    RgQ₁₂ = AcbRefMatrix(nmax, nmax)
+    RgQ₂₁ = AcbRefMatrix(nmax, nmax)
+    RgQ₂₂ = AcbRefMatrix(nmax, nmax)
 
     # Since T = -RgQ⋅Q', the coefficient -i of Q and RgQ can be cancelled out.
 
     tmp = AcbRefMatrix(nmax, nmax)
-    Arblib.mul!(Q11, J21, kk_s)
-    Arblib.mul!(tmp, J12, kk)
-    Arblib.add!(Q11, Q11, tmp)
+    Arblib.mul!(Q₁₁, J₂₁, kkₛ)
+    Arblib.mul!(tmp, J₁₂, k²)
+    Arblib.add!(Q₁₁, Q₁₁, tmp)
 
-    Arblib.mul!(Q22, J12, kk_s)
-    Arblib.mul!(tmp, J21, kk)
-    Arblib.add!(Q22, Q22, tmp)
+    Arblib.mul!(Q₂₂, J₁₂, kkₛ)
+    Arblib.mul!(tmp, J₂₁, k²)
+    Arblib.add!(Q₂₂, Q₂₂, tmp)
 
-    Arblib.mul!(RgQ11, RgJ21, kk_s)
-    Arblib.mul!(tmp, RgJ12, kk)
-    Arblib.add!(RgQ11, RgQ11, tmp)
+    Arblib.mul!(RgQ₁₁, RgJ₂₁, kkₛ)
+    Arblib.mul!(tmp, RgJ₁₂, k²)
+    Arblib.add!(RgQ₁₁, RgQ₁₁, tmp)
 
-    Arblib.mul!(RgQ22, RgJ12, kk_s)
-    Arblib.mul!(tmp, RgJ21, kk)
-    Arblib.add!(RgQ22, RgQ22, tmp)
+    Arblib.mul!(RgQ₂₂, RgJ₁₂, kkₛ)
+    Arblib.mul!(tmp, RgJ₂₁, k²)
+    Arblib.add!(RgQ₂₂, RgQ₂₂, tmp)
 
-    Q = vcat(hcat(Q11, Q12), hcat(Q21, Q22))
-    RgQ = vcat(hcat(RgQ11, RgQ12), hcat(RgQ21, RgQ22))
+    Q = vcat(hcat(Q₁₁, Q₁₂), hcat(Q₂₁, Q₂₂))
+    RgQ = vcat(hcat(RgQ₁₁, RgQ₁₂), hcat(RgQ₂₁, RgQ₂₂))
 
     IQ = similar(Q)
     if ARB_APPROX_INV[]
@@ -413,10 +413,10 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
             @debug begin
                 push!(ACCURACY_INFO[], ("d", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(d)))
                 push!(ACCURACY_INFO[], ("τ", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(τ)))
-                push!(ACCURACY_INFO[], ("J12", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(J12)))
-                push!(ACCURACY_INFO[], ("J21", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(J21)))
-                push!(ACCURACY_INFO[], ("RgJ12", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ12)))
-                push!(ACCURACY_INFO[], ("RgJ21", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ21)))
+                push!(ACCURACY_INFO[], ("J₁₂", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₁₂)))
+                push!(ACCURACY_INFO[], ("J₂₁", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₂₁)))
+                push!(ACCURACY_INFO[], ("RgJ₁₂", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₁₂)))
+                push!(ACCURACY_INFO[], ("RgJ₂₁", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₂₁)))
                 push!(ACCURACY_INFO[], ("RgQ", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgQ)))
                 push!(ACCURACY_INFO[], ("Q", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(Q)))
                 push!(ACCURACY_INFO[], ("inv(Q)", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(IQ)))
@@ -458,146 +458,140 @@ function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax
 
     ngss = sym ? (ngauss ÷ 2) : ngauss
     drr = info.drr
-    kr1 = info.kr1
-    kr_s1 = info.kr_s1
-    wr2 = info.wr2
+    kr⁻¹ = info.kr⁻¹
+    kₛr⁻¹ = info.kₛr⁻¹
+    wr² = info.wr²
 
     jkr = info.jkr
     djkr = info.djkr
     hkr = info.hkr
     dhkr = info.dhkr
-    jkr_s = info.jkr_s
-    djkr_s = info.djkr_s
+    jkₛr = info.jkₛr
+    djkₛr = info.djkₛr
 
     nm = nmax - mm + 1
-    J11 = AcbRefMatrix(nm, nm)
-    J12 = AcbRefMatrix(nm, nm)
-    J21 = AcbRefMatrix(nm, nm)
-    J22 = AcbRefMatrix(nm, nm)
-    RgJ11 = AcbRefMatrix(nm, nm)
-    RgJ12 = AcbRefMatrix(nm, nm)
-    RgJ21 = AcbRefMatrix(nm, nm)
-    RgJ22 = AcbRefMatrix(nm, nm)
+    J₁₁ = AcbRefMatrix(nm, nm)
+    J₁₂ = AcbRefMatrix(nm, nm)
+    J₂₁ = AcbRefMatrix(nm, nm)
+    J₂₂ = AcbRefMatrix(nm, nm)
+    RgJ₁₁ = AcbRefMatrix(nm, nm)
+    RgJ₁₂ = AcbRefMatrix(nm, nm)
+    RgJ₂₁ = AcbRefMatrix(nm, nm)
+    RgJ₂₂ = AcbRefMatrix(nm, nm)
 
     Threads.@threads for nn in 0:(nm * nm - 1)
-        n2 = nn ÷ nm + mm
-        n1 = nn % nm + mm
-        nn2 = n2 - mm + 1
-        nn1 = n1 - mm + 1
+        n₂ = nn ÷ nm + mm
+        n₁ = nn % nm + mm
+        nn₂ = n₂ - mm + 1
+        nn₁ = n₁ - mm + 1
         for i in 1:ngss
-            if !(sym && (n1 + n2) % 2 == 0)
-                pττp = p[i][n1] * τ[i][n2] + p[i][n2] * τ[i][n1]
-                p₁d₂ = p[i][n1] * d[i][n2]
+            if !(sym && (n₁ + n₂) % 2 == 0)
+                pττp = p[i][n₁] * τ[i][n₂] + p[i][n₂] * τ[i][n₁]
+                p₁d₂ = p[i][n₁] * d[i][n₂]
 
-                J11[nn1, nn2] += wr2[i] * hkr[i, n1] * jkr_s[i, n2] * pττp
+                J₁₁[nn₁, nn₂] += wr²[i] * hkr[i, n₁] * jkₛr[i, n₂] * pττp
 
-                J22[nn1, nn2] +=
-                    wr2[i] * (
-                        dhkr[i, n1] * djkr_s[i, n2] * pττp +
+                J₂₂[nn₁, nn₂] +=
+                    wr²[i] * (
+                        dhkr[i, n₁] * djkₛr[i, n₂] * pττp +
                         drr[i] *
-                        (
-                            an[n1] * hkr[i, n1] * kr1[i] * djkr_s[i, n2] +
-                            an[n2] * jkr_s[i, n2] * kr_s1[i] * dhkr[i, n1]
-                        ) *
+                        (an[n₁] * hkr[i, n₁] * kr⁻¹[i] * djkₛr[i, n₂] + an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * dhkr[i, n₁]) *
                         p₁d₂
                     )
 
-                RgJ11[nn1, nn2] += wr2[i] * jkr[i, n1] * jkr_s[i, n2] * pττp
+                RgJ₁₁[nn₁, nn₂] += wr²[i] * jkr[i, n₁] * jkₛr[i, n₂] * pττp
 
-                RgJ22[nn1, nn2] +=
-                    wr2[i] * (
-                        djkr[i, n1] * djkr_s[i, n2] * pττp +
+                RgJ₂₂[nn₁, nn₂] +=
+                    wr²[i] * (
+                        djkr[i, n₁] * djkₛr[i, n₂] * pττp +
                         drr[i] *
-                        (
-                            an[n1] * jkr[i, n1] * kr1[i] * djkr_s[i, n2] +
-                            an[n2] * jkr_s[i, n2] * kr_s1[i] * djkr[i, n1]
-                        ) *
+                        (an[n₁] * jkr[i, n₁] * kr⁻¹[i] * djkₛr[i, n₂] + an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * djkr[i, n₁]) *
                         p₁d₂
                     )
             end
 
-            if !(sym && (n1 + n2) % 2 == 1)
-                ppττ = p[i][n1] * p[i][n2] + τ[i][n1] * τ[i][n2]
-                d₁τ₂ = d[i][n1] * τ[i][n2]
-                d₂τ₁ = d[i][n2] * τ[i][n1]
+            if !(sym && (n₁ + n₂) % 2 == 1)
+                ppττ = p[i][n₁] * p[i][n₂] + τ[i][n₁] * τ[i][n₂]
+                d₁τ₂ = d[i][n₁] * τ[i][n₂]
+                d₂τ₁ = d[i][n₂] * τ[i][n₁]
 
-                J12[nn1, nn2] +=
-                    wr2[i] * jkr_s[i, n2] * (dhkr[i, n1] * ppττ + drr[i] * an[n1] * hkr[i, n1] * kr1[i] * d₁τ₂)
+                J₁₂[nn₁, nn₂] +=
+                    wr²[i] * jkₛr[i, n₂] * (dhkr[i, n₁] * ppττ + drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                J21[nn1, nn2] +=
-                    wr2[i] * hkr[i, n1] * (djkr_s[i, n2] * ppττ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
+                J₂₁[nn₁, nn₂] +=
+                    wr²[i] * hkr[i, n₁] * (djkₛr[i, n₂] * ppττ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
 
-                RgJ12[nn1, nn2] +=
-                    wr2[i] * jkr_s[i, n2] * (djkr[i, n1] * ppττ + drr[i] * an[n1] * jkr[i, n1] * kr1[i] * d₁τ₂)
+                RgJ₁₂[nn₁, nn₂] +=
+                    wr²[i] * jkₛr[i, n₂] * (djkr[i, n₁] * ppττ + drr[i] * an[n₁] * jkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                RgJ21[nn1, nn2] +=
-                    wr2[i] * jkr[i, n1] * (djkr_s[i, n2] * ppττ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
+                RgJ₂₁[nn₁, nn₂] +=
+                    wr²[i] * jkr[i, n₁] * (djkₛr[i, n₂] * ppττ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
             end
         end
     end
 
     ann = view(ann, mm:nmax, mm:nmax)
-    J11 .*= -ann
-    J12 .*= -1.0im * ann
-    J21 .*= 1.0im * ann
-    J22 .*= -ann
+    J₁₁ .*= -ann
+    J₁₂ .*= -1.0im * ann
+    J₂₁ .*= 1.0im * ann
+    J₂₂ .*= -ann
 
-    RgJ11 .*= -ann
-    RgJ12 .*= -1.0im * ann
-    RgJ21 .*= 1.0im * ann
-    RgJ22 .*= -ann
+    RgJ₁₁ .*= -ann
+    RgJ₁₂ .*= -1.0im * ann
+    RgJ₂₁ .*= 1.0im * ann
+    RgJ₂₂ .*= -ann
 
     k = 2 * Arb(π) / scatterer.λ
-    k_s = k * scatterer.m
-    kk = Acb(k^2)
-    kk_s = k * k_s
+    kₛ = k * scatterer.m
+    k² = Acb(k^2)
+    kkₛ = k * kₛ
 
-    Q11 = AcbRefMatrix(nm, nm)
-    Q12 = AcbRefMatrix(nm, nm)
-    Q21 = AcbRefMatrix(nm, nm)
-    Q22 = AcbRefMatrix(nm, nm)
-    RgQ11 = AcbRefMatrix(nm, nm)
-    RgQ12 = AcbRefMatrix(nm, nm)
-    RgQ21 = AcbRefMatrix(nm, nm)
-    RgQ22 = AcbRefMatrix(nm, nm)
+    Q₁₁ = AcbRefMatrix(nm, nm)
+    Q₁₂ = AcbRefMatrix(nm, nm)
+    Q₂₁ = AcbRefMatrix(nm, nm)
+    Q₂₂ = AcbRefMatrix(nm, nm)
+    RgQ₁₁ = AcbRefMatrix(nm, nm)
+    RgQ₁₂ = AcbRefMatrix(nm, nm)
+    RgQ₂₁ = AcbRefMatrix(nm, nm)
+    RgQ₂₂ = AcbRefMatrix(nm, nm)
 
     # Since T = -RgQ⋅Q', the coefficient -i of Q and RgQ can be cancelled out.
 
     tmp = AcbRefMatrix(nm, nm)
-    Arblib.mul!(Q11, J21, kk_s)
-    Arblib.mul!(tmp, J12, kk)
-    Arblib.add!(Q11, Q11, tmp)
+    Arblib.mul!(Q₁₁, J₂₁, kkₛ)
+    Arblib.mul!(tmp, J₁₂, k²)
+    Arblib.add!(Q₁₁, Q₁₁, tmp)
 
-    Arblib.mul!(Q12, J11, kk_s)
-    Arblib.mul!(tmp, J22, kk)
-    Arblib.add!(Q12, Q12, tmp)
+    Arblib.mul!(Q₁₂, J₁₁, kkₛ)
+    Arblib.mul!(tmp, J₂₂, k²)
+    Arblib.add!(Q₁₂, Q₁₂, tmp)
 
-    Arblib.mul!(Q21, J22, kk_s)
-    Arblib.mul!(tmp, J11, kk)
-    Arblib.add!(Q21, Q21, tmp)
+    Arblib.mul!(Q₂₁, J₂₂, kkₛ)
+    Arblib.mul!(tmp, J₁₁, k²)
+    Arblib.add!(Q₂₁, Q₂₁, tmp)
 
-    Arblib.mul!(Q22, J12, kk_s)
-    Arblib.mul!(tmp, J21, kk)
-    Arblib.add!(Q22, Q22, tmp)
+    Arblib.mul!(Q₂₂, J₁₂, kkₛ)
+    Arblib.mul!(tmp, J₂₁, k²)
+    Arblib.add!(Q₂₂, Q₂₂, tmp)
 
-    Arblib.mul!(RgQ11, RgJ21, kk_s)
-    Arblib.mul!(tmp, RgJ12, kk)
-    Arblib.add!(RgQ11, RgQ11, tmp)
+    Arblib.mul!(RgQ₁₁, RgJ₂₁, kkₛ)
+    Arblib.mul!(tmp, RgJ₁₂, k²)
+    Arblib.add!(RgQ₁₁, RgQ₁₁, tmp)
 
-    Arblib.mul!(RgQ12, RgJ11, kk_s)
-    Arblib.mul!(tmp, RgJ22, kk)
-    Arblib.add!(RgQ12, RgQ12, tmp)
+    Arblib.mul!(RgQ₁₂, RgJ₁₁, kkₛ)
+    Arblib.mul!(tmp, RgJ₂₂, k²)
+    Arblib.add!(RgQ₁₂, RgQ₁₂, tmp)
 
-    Arblib.mul!(RgQ21, RgJ22, kk_s)
-    Arblib.mul!(tmp, RgJ11, kk)
-    Arblib.add!(RgQ21, RgQ21, tmp)
+    Arblib.mul!(RgQ₂₁, RgJ₂₂, kkₛ)
+    Arblib.mul!(tmp, RgJ₁₁, k²)
+    Arblib.add!(RgQ₂₁, RgQ₂₁, tmp)
 
-    Arblib.mul!(RgQ22, RgJ12, kk_s)
-    Arblib.mul!(tmp, RgJ21, kk)
-    Arblib.add!(RgQ22, RgQ22, tmp)
+    Arblib.mul!(RgQ₂₂, RgJ₁₂, kkₛ)
+    Arblib.mul!(tmp, RgJ₂₁, k²)
+    Arblib.add!(RgQ₂₂, RgQ₂₂, tmp)
 
-    Q = vcat(hcat(Q11, Q12), hcat(Q21, Q22))
-    RgQ = vcat(hcat(RgQ11, RgQ12), hcat(RgQ21, RgQ22))
+    Q = vcat(hcat(Q₁₁, Q₁₂), hcat(Q₂₁, Q₂₂))
+    RgQ = vcat(hcat(RgQ₁₁, RgQ₁₂), hcat(RgQ₂₁, RgQ₂₂))
 
     IQ = similar(Q)
     if ARB_APPROX_INV[]
@@ -618,14 +612,14 @@ function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax
                 push!(ACCURACY_INFO[], ("d", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(d)))
                 push!(ACCURACY_INFO[], ("p", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(p)))
                 push!(ACCURACY_INFO[], ("τ", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(τ)))
-                push!(ACCURACY_INFO[], ("J11", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J11)))
-                push!(ACCURACY_INFO[], ("J12", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J12)))
-                push!(ACCURACY_INFO[], ("J21", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J21)))
-                push!(ACCURACY_INFO[], ("J22", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J22)))
-                push!(ACCURACY_INFO[], ("RgJ11", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ11)))
-                push!(ACCURACY_INFO[], ("RgJ12", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ12)))
-                push!(ACCURACY_INFO[], ("RgJ21", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ21)))
-                push!(ACCURACY_INFO[], ("RgJ22", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ22)))
+                push!(ACCURACY_INFO[], ("J₁₁", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₁₁)))
+                push!(ACCURACY_INFO[], ("J₁₂", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₁₂)))
+                push!(ACCURACY_INFO[], ("J₂₁", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₂₁)))
+                push!(ACCURACY_INFO[], ("J₂₂", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₂₂)))
+                push!(ACCURACY_INFO[], ("RgJ₁₁", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₁₁)))
+                push!(ACCURACY_INFO[], ("RgJ₁₂", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₁₂)))
+                push!(ACCURACY_INFO[], ("RgJ₂₁", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₂₁)))
+                push!(ACCURACY_INFO[], ("RgJ₂₂", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₂₂)))
                 push!(ACCURACY_INFO[], ("RgQ", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgQ)))
                 push!(ACCURACY_INFO[], ("Q", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(Q)))
                 push!(ACCURACY_INFO[], ("inv(Q)", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(IQ)))

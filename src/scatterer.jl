@@ -104,9 +104,9 @@ mutable struct ScattererInfo{RV<:AbstractVector,RM<:AbstractMatrix,CV<:AbstractV
     r::RV # (ngauss,)
     dr::RV # (ngauss,)
     drr::RV # (ngauss,)
-    wr2::RV # (ngauss,)
-    kr1::RV # (ngauss,)
-    kr_s1::CV # (ngauss,)
+    wr²::RV # (ngauss,)
+    kr⁻¹::RV # (ngauss,)
+    kₛr⁻¹::CV # (ngauss,)
     d::RM # (ngauss, nmax)
     τ::RM # (ngauss, nmax)
     p::RM # (ngauss, nmax)
@@ -117,17 +117,17 @@ mutable struct ScattererInfo{RV<:AbstractVector,RM<:AbstractMatrix,CV<:AbstractV
     dykr::RM # (ngauss, nmax)
     hkr::CM # (ngauss, nmax)
     dhkr::CM # (ngauss, nmax)
-    jkr_s::CM # (ngauss, nmax)
-    djkr_s::CM # (ngauss, nmax)
+    jkₛr::CM # (ngauss, nmax)
+    djkₛr::CM # (ngauss, nmax)
     j_s_tmp::CV # (2ncap,)
-    J11::CM # (nmax, nmax)
-    J12::CM # (nmax, nmax)
-    J21::CM # (nmax, nmax)
-    J22::CM # (nmax, nmax)
-    RgJ11::CM # (nmax, nmax)
-    RgJ12::CM # (nmax, nmax)
-    RgJ21::CM # (nmax, nmax)
-    RgJ22::CM # (nmax, nmax)
+    J₁₁::CM # (nmax, nmax)
+    J₁₂::CM # (nmax, nmax)
+    J₂₁::CM # (nmax, nmax)
+    J₂₂::CM # (nmax, nmax)
+    RgJ₁₁::CM # (nmax, nmax)
+    RgJ₁₂::CM # (nmax, nmax)
+    RgJ₂₁::CM # (nmax, nmax)
+    RgJ₂₂::CM # (nmax, nmax)
     Q::CM # (2nmax, 2nmax)
     RgQ::CM # (2nmax, 2nmax)
 end
@@ -750,16 +750,16 @@ function calc_amplitude(
                 else
                     T12 = TT[m + 1][n, nn + nm]
                     T21 = TT[m + 1][n + nm, nn]
-                    CN1 = CAL[n + dm, nn + dm] * fc
-                    CN2 = CAL[n + dm, nn + dm] * fs
+                    Cn₁ = CAL[n + dm, nn + dm] * fc
+                    Cn₂ = CAL[n + dm, nn + dm] * fs
                     D11 = m^2 * dv1[n + dm] * dv01[nn + dm]
                     D12 = m * dv1[n + dm] * dv02[nn + dm]
                     D21 = m * dv2[n + dm] * dv01[nn + dm]
                     D22 = dv2[n + dm] * dv02[nn + dm]
-                    VV += (T11 * D11 + T21 * D21 + T12 * D12 + T22 * D22) * CN1
-                    VH += (T11 * D12 + T21 * D22 + T12 * D11 + T22 * D21) * CN2
-                    HV -= (T11 * D21 + T21 * D11 + T12 * D22 + T22 * D12) * CN2
-                    HH += (T11 * D22 + T21 * D12 + T12 * D21 + T22 * D11) * CN1
+                    VV += (T11 * D11 + T21 * D21 + T12 * D12 + T22 * D22) * Cn₁
+                    VH += (T11 * D12 + T21 * D22 + T12 * D11 + T22 * D21) * Cn₂
+                    HV -= (T11 * D21 + T21 * D11 + T12 * D22 + T22 * D12) * Cn₂
+                    HH += (T11 * D22 + T21 * D12 + T12 * D21 + T22 * D11) * Cn₁
                 end
             end
         end
@@ -1262,22 +1262,22 @@ function update!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) wh
             info.r = zeros(T, info.ngcap)
             info.dr = zeros(T, info.ngcap)
             info.drr = zeros(T, info.ngcap)
-            info.wr2 = zeros(T, info.ngcap)
-            info.kr1 = zeros(T, info.ngcap)
-            info.kr_s1 = zeros(Complex{T}, info.ngcap)
+            info.wr² = zeros(T, info.ngcap)
+            info.kr⁻¹ = zeros(T, info.ngcap)
+            info.kₛr⁻¹ = zeros(Complex{T}, info.ngcap)
         end
 
         if info.ncap > ncap
             info.j_tmp = zeros(T, 3info.ncap)
             info.j_s_tmp = zeros(Complex{T}, 3info.ncap)
-            info.J11 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.J12 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.J21 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.J22 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.RgJ11 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.RgJ12 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.RgJ21 = zeros(Complex{T}, info.ncap, info.ncap)
-            info.RgJ22 = zeros(Complex{T}, info.ncap, info.ncap)
+            info.J₁₁ = zeros(Complex{T}, info.ncap, info.ncap)
+            info.J₁₂ = zeros(Complex{T}, info.ncap, info.ncap)
+            info.J₂₁ = zeros(Complex{T}, info.ncap, info.ncap)
+            info.J₂₂ = zeros(Complex{T}, info.ncap, info.ncap)
+            info.RgJ₁₁ = zeros(Complex{T}, info.ncap, info.ncap)
+            info.RgJ₁₂ = zeros(Complex{T}, info.ncap, info.ncap)
+            info.RgJ₂₁ = zeros(Complex{T}, info.ncap, info.ncap)
+            info.RgJ₂₂ = zeros(Complex{T}, info.ncap, info.ncap)
             info.Q = zeros(Complex{T}, 2info.ncap, 2info.ncap)
             info.RgQ = zeros(Complex{T}, 2info.ncap, 2info.ncap)
         end
@@ -1292,12 +1292,12 @@ function update!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) wh
             info.dykr = zeros(T, info.ngcap, info.ncap)
             info.hkr = zeros(Complex{T}, info.ngcap, info.ncap)
             info.dhkr = zeros(Complex{T}, info.ngcap, info.ncap)
-            info.jkr_s = zeros(Complex{T}, info.ngcap, info.ncap)
-            info.djkr_s = zeros(Complex{T}, info.ngcap, info.ncap)
+            info.jkₛr = zeros(Complex{T}, info.ngcap, info.ncap)
+            info.djkₛr = zeros(Complex{T}, info.ngcap, info.ncap)
         end
     end
 
-    # Need to recalculate `x`, `w`, `s`, `r`, `dr`, `kr1` and `kr_s1` only if `ngauss` changes.
+    # Need to recalculate `x`, `w`, `s`, `r`, `dr`, `kr⁻¹` and `kₛr⁻¹` only if `ngauss` changes.
     k = 2 * T(π) / scatterer.λ
 
     if ngauss != info.ngauss
@@ -1312,14 +1312,14 @@ function update!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) wh
     end
 
     kr = k * info.r[1:ngauss]
-    kr_s = scatterer.m * kr
+    kₛr = scatterer.m * kr
 
     if ngauss != info.ngauss
         @. info.drr[1:ngauss] = info.dr[1:ngauss] / info.r[1:ngauss]
-        @. info.wr2[1:ngauss] = info.w[1:ngauss] * info.r[1:ngauss] * info.r[1:ngauss]
+        @. info.wr²[1:ngauss] = info.w[1:ngauss] * info.r[1:ngauss] * info.r[1:ngauss]
         @. info.s[1:ngauss] = 1 / (sin ∘ acos)(info.x[1:ngauss])
-        @. info.kr1[1:ngauss] = 1 / kr
-        @. info.kr_s1[1:ngauss] = 1 / kr_s
+        @. info.kr⁻¹[1:ngauss] = 1 / kr
+        @. info.kₛr⁻¹[1:ngauss] = 1 / kₛr
     end
 
     # The rest need to be recalculated when either `ngauss` or `nmax` changes.
@@ -1333,7 +1333,7 @@ function update!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) wh
     for i in 1:ngauss
         sphericalbesselj!(kr[i], nmax, nnmax1, view(info.jkr, i, :), view(info.djkr, i, :), info.j_tmp)
         sphericalbessely!(kr[i], nmax, view(info.ykr, i, :), view(info.dykr, i, :))
-        sphericalbesselj!(kr_s[i], nmax, nnmax2, view(info.jkr_s, i, :), view(info.djkr_s, i, :), info.j_s_tmp)
+        sphericalbesselj!(kₛr[i], nmax, nnmax2, view(info.jkₛr, i, :), view(info.djkₛr, i, :), info.j_s_tmp)
     end
 
     view(info.hkr, 1:ngauss, 1:nmax) .= complex.(view(info.jkr, 1:ngauss, 1:nmax), view(info.ykr, 1:ngauss, 1:nmax))
@@ -1347,7 +1347,7 @@ end
 
 function constant(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where {T<:Real}
     an = [Float64(n * (n + 1)) for n in 1:nmax]
-    ann = [0.5 * √((2n1 + 1) * (2n2 + 1) / (n1 * (n1 + 1) * n2 * (n2 + 1))) for n1 in 1:nmax, n2 in 1:nmax]
+    ann = [0.5 * √((2n₁ + 1) * (2n₂ + 1) / (n₁ * (n₁ + 1) * n₂ * (n₂ + 1))) for n₁ in 1:nmax, n₂ in 1:nmax]
 
     x = zeros(ngauss)
     w = zeros(ngauss)
@@ -1363,9 +1363,9 @@ function vary(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where
     λ = scatterer.λ
     k = 2 * T(π) / λ
     kr = k * r
-    kr1 = 1.0 ./ kr
-    kr_s = scatterer.m * kr
-    kr_s1 = 1.0 ./ kr_s
+    kr⁻¹ = 1.0 ./ kr
+    kₛr = scatterer.m * kr
+    kₛr⁻¹ = 1.0 ./ kₛr
     rmax = maximum(r)
     krmax = k * rmax
     tb = max(nmax, krmax * norm(scatterer.m))
@@ -1376,18 +1376,18 @@ function vary(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where
     djkr = zeros(T, ngauss, nmax)
     ykr = zeros(T, ngauss, nmax)
     dykr = zeros(T, ngauss, nmax)
-    jkr_s = zeros(Complex{T}, ngauss, nmax)
-    djkr_s = zeros(Complex{T}, ngauss, nmax)
+    jkₛr = zeros(Complex{T}, ngauss, nmax)
+    djkₛr = zeros(Complex{T}, ngauss, nmax)
     j_tmp = zeros(T, nmax + nnmax1)
     j_s_tmp = zeros(Complex{T}, nmax + nnmax2)
 
     for i in 1:ngauss
         sphericalbesselj!(kr[i], nmax, nnmax1, view(jkr, i, :), view(djkr, i, :), j_tmp)
         sphericalbessely!(kr[i], nmax, view(ykr, i, :), view(dykr, i, :))
-        sphericalbesselj!(kr_s[i], nmax, nnmax2, view(jkr_s, i, :), view(djkr_s, i, :), j_s_tmp)
+        sphericalbesselj!(kₛr[i], nmax, nnmax2, view(jkₛr, i, :), view(djkₛr, i, :), j_s_tmp)
     end
 
-    return r, dr, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s
+    return r, dr, kr⁻¹, kₛr⁻¹, jkr, djkr, ykr, dykr, jkₛr, djkₛr
 end
 
 function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) where {T<:Real}
@@ -1413,77 +1413,77 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
 
     ngss = sym ? (ngauss ÷ 2) : ngauss
     drr = view(info.drr, 1:ngss)
-    kr1 = view(info.kr1, 1:ngss)
-    kr_s1 = view(info.kr_s1, 1:ngss)
-    wr2 = view(info.wr2, 1:ngss)
+    kr⁻¹ = view(info.kr⁻¹, 1:ngss)
+    kₛr⁻¹ = view(info.kₛr⁻¹, 1:ngss)
+    wr² = view(info.wr², 1:ngss)
 
     jkr = view(info.jkr, 1:ngss, 1:nmax)
     djkr = view(info.djkr, 1:ngss, 1:nmax)
     hkr = view(info.hkr, 1:ngss, 1:nmax)
     dhkr = view(info.dhkr, 1:ngss, 1:nmax)
-    jkr_s = view(info.jkr_s, 1:ngss, 1:nmax)
-    djkr_s = view(info.djkr_s, 1:ngss, 1:nmax)
+    jkₛr = view(info.jkₛr, 1:ngss, 1:nmax)
+    djkₛr = view(info.djkₛr, 1:ngss, 1:nmax)
 
-    J12 = view(info.J12, 1:nmax, 1:nmax)
-    J21 = view(info.J21, 1:nmax, 1:nmax)
-    RgJ12 = view(info.RgJ12, 1:nmax, 1:nmax)
-    RgJ21 = view(info.RgJ21, 1:nmax, 1:nmax)
-    fill!(J12, zero(CT))
-    fill!(J21, zero(CT))
-    fill!(RgJ12, zero(CT))
-    fill!(RgJ21, zero(CT))
+    J₁₂ = view(info.J₁₂, 1:nmax, 1:nmax)
+    J₂₁ = view(info.J₂₁, 1:nmax, 1:nmax)
+    RgJ₁₂ = view(info.RgJ₁₂, 1:nmax, 1:nmax)
+    RgJ₂₁ = view(info.RgJ₂₁, 1:nmax, 1:nmax)
+    fill!(J₁₂, zero(CT))
+    fill!(J₂₁, zero(CT))
+    fill!(RgJ₁₂, zero(CT))
+    fill!(RgJ₂₁, zero(CT))
 
     Threads.@threads for nn in 0:(nmax * nmax - 1)
-        n2 = nn ÷ nmax + 1
-        n1 = nn % nmax + 1
+        n₂ = nn ÷ nmax + 1
+        n₁ = nn % nmax + 1
         for i in 1:ngss
-            τ₁τ₂ = τ[i, n1] * τ[i, n2]
-            d₁τ₂ = d[i, n1] * τ[i, n2]
-            d₂τ₁ = d[i, n2] * τ[i, n1]
+            τ₁τ₂ = τ[i, n₁] * τ[i, n₂]
+            d₁τ₂ = d[i, n₁] * τ[i, n₂]
+            d₂τ₁ = d[i, n₂] * τ[i, n₁]
 
-            if !(sym && (n1 + n2) % 2 == 1)
-                J12[n1, n2] +=
-                    wr2[i] * jkr_s[i, n2] * (dhkr[i, n1] * τ₁τ₂ + drr[i] * an[n1] * hkr[i, n1] * kr1[i] * d₁τ₂)
+            if !(sym && (n₁ + n₂) % 2 == 1)
+                J₁₂[n₁, n₂] +=
+                    wr²[i] * jkₛr[i, n₂] * (dhkr[i, n₁] * τ₁τ₂ + drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                J21[n1, n2] +=
-                    wr2[i] * hkr[i, n1] * (djkr_s[i, n2] * τ₁τ₂ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
+                J₂₁[n₁, n₂] +=
+                    wr²[i] * hkr[i, n₁] * (djkₛr[i, n₂] * τ₁τ₂ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
 
-                RgJ12[n1, n2] +=
-                    wr2[i] * jkr_s[i, n2] * (djkr[i, n1] * τ₁τ₂ + drr[i] * an[n1] * jkr[i, n1] * kr1[i] * d₁τ₂)
+                RgJ₁₂[n₁, n₂] +=
+                    wr²[i] * jkₛr[i, n₂] * (djkr[i, n₁] * τ₁τ₂ + drr[i] * an[n₁] * jkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                RgJ21[n1, n2] +=
-                    wr2[i] * jkr[i, n1] * (djkr_s[i, n2] * τ₁τ₂ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
+                RgJ₂₁[n₁, n₂] +=
+                    wr²[i] * jkr[i, n₁] * (djkₛr[i, n₂] * τ₁τ₂ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
             end
         end
     end
 
-    @. J12 *= -1.0im * ann
-    @. J21 *= 1.0im * ann
+    @. J₁₂ *= -1.0im * ann
+    @. J₂₁ *= 1.0im * ann
 
-    @. RgJ12 *= -1.0im * ann
-    @. RgJ21 *= 1.0im * ann
+    @. RgJ₁₂ *= -1.0im * ann
+    @. RgJ₂₁ *= 1.0im * ann
 
     k = 2 * T(π) / scatterer.λ
-    k_s = k * scatterer.m
-    kk = k^2
-    kk_s = k * k_s
+    kₛ = k * scatterer.m
+    k² = k^2
+    kkₛ = k * kₛ
 
     # Since T = -RgQ⋅Q', the coefficient -i of Q and RgQ can be cancelled out.
 
     Q = view(info.Q, 1:(2nmax), 1:(2nmax))
-    Q11 = view(Q, 1:nmax, 1:nmax)
-    Q22 = view(Q, (nmax + 1):(2nmax), (nmax + 1):(2nmax))
+    Q₁₁ = view(Q, 1:nmax, 1:nmax)
+    Q₂₂ = view(Q, (nmax + 1):(2nmax), (nmax + 1):(2nmax))
     RgQ = view(info.RgQ, 1:(2nmax), 1:(2nmax))
-    RgQ11 = view(RgQ, 1:nmax, 1:nmax)
-    RgQ22 = view(RgQ, (nmax + 1):(2nmax), (nmax + 1):(2nmax))
+    RgQ₁₁ = view(RgQ, 1:nmax, 1:nmax)
+    RgQ₂₂ = view(RgQ, (nmax + 1):(2nmax), (nmax + 1):(2nmax))
     fill!(Q, zero(CT))
     fill!(RgQ, zero(CT))
 
-    @. Q11 = kk_s * J21 + kk * J12
-    @. Q22 = kk_s * J12 + kk * J21
+    @. Q₁₁ = kkₛ * J₂₁ + k² * J₁₂
+    @. Q₂₂ = kkₛ * J₁₂ + k² * J₂₁
 
-    @. RgQ11 = kk_s * RgJ21 + kk * RgJ12
-    @. RgQ22 = kk_s * RgJ12 + kk * RgJ21
+    @. RgQ₁₁ = kkₛ * RgJ₂₁ + k² * RgJ₁₂
+    @. RgQ₂₂ = kkₛ * RgJ₁₂ + k² * RgJ₂₁
 
     LinearAlgebra.inv!(lu!(Q))
     T0 = RgQ * Q
@@ -1518,143 +1518,134 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
     end
 
     ngss = sym ? (ngauss ÷ 2) : ngauss
-    w = view(info.w, 1:ngss)
-    r = view(info.r, 1:ngss)
-    dr = view(info.dr, 1:ngss)
     drr = view(info.drr, 1:ngss)
-    kr1 = view(info.kr1, 1:ngss)
-    kr_s1 = view(info.kr_s1, 1:ngss)
-    wr2 = view(info.wr2, 1:ngss)
+    kr⁻¹ = view(info.kr⁻¹, 1:ngss)
+    kₛr⁻¹ = view(info.kₛr⁻¹, 1:ngss)
+    wr² = view(info.wr², 1:ngss)
 
     jkr = view(info.jkr, 1:ngss, 1:nmax)
     djkr = view(info.djkr, 1:ngss, 1:nmax)
     hkr = view(info.hkr, 1:ngss, 1:nmax)
     dhkr = view(info.dhkr, 1:ngss, 1:nmax)
-    jkr_s = view(info.jkr_s, 1:ngss, 1:nmax)
-    djkr_s = view(info.djkr_s, 1:ngss, 1:nmax)
+    jkₛr = view(info.jkₛr, 1:ngss, 1:nmax)
+    djkₛr = view(info.djkₛr, 1:ngss, 1:nmax)
 
-    J11 = view(info.J11, mm:nmax, mm:nmax)
-    J12 = view(info.J12, mm:nmax, mm:nmax)
-    J21 = view(info.J21, mm:nmax, mm:nmax)
-    J22 = view(info.J22, mm:nmax, mm:nmax)
-    RgJ11 = view(info.RgJ11, mm:nmax, mm:nmax)
-    RgJ12 = view(info.RgJ12, mm:nmax, mm:nmax)
-    RgJ21 = view(info.RgJ21, mm:nmax, mm:nmax)
-    RgJ22 = view(info.RgJ22, mm:nmax, mm:nmax)
-    fill!(J11, zero(eltype(J11)))
-    fill!(J12, zero(eltype(J12)))
-    fill!(J21, zero(eltype(J21)))
-    fill!(J22, zero(eltype(J22)))
-    fill!(RgJ11, zero(eltype(RgJ11)))
-    fill!(RgJ12, zero(eltype(RgJ12)))
-    fill!(RgJ21, zero(eltype(RgJ21)))
-    fill!(RgJ22, zero(eltype(RgJ22)))
+    J₁₁ = view(info.J₁₁, mm:nmax, mm:nmax)
+    J₁₂ = view(info.J₁₂, mm:nmax, mm:nmax)
+    J₂₁ = view(info.J₂₁, mm:nmax, mm:nmax)
+    J₂₂ = view(info.J₂₂, mm:nmax, mm:nmax)
+    RgJ₁₁ = view(info.RgJ₁₁, mm:nmax, mm:nmax)
+    RgJ₁₂ = view(info.RgJ₁₂, mm:nmax, mm:nmax)
+    RgJ₂₁ = view(info.RgJ₂₁, mm:nmax, mm:nmax)
+    RgJ₂₂ = view(info.RgJ₂₂, mm:nmax, mm:nmax)
+    fill!(J₁₁, zero(eltype(J₁₁)))
+    fill!(J₁₂, zero(eltype(J₁₂)))
+    fill!(J₂₁, zero(eltype(J₂₁)))
+    fill!(J₂₂, zero(eltype(J₂₂)))
+    fill!(RgJ₁₁, zero(eltype(RgJ₁₁)))
+    fill!(RgJ₁₂, zero(eltype(RgJ₁₂)))
+    fill!(RgJ₂₁, zero(eltype(RgJ₂₁)))
+    fill!(RgJ₂₂, zero(eltype(RgJ₂₂)))
 
-    OffsetJ11 = OffsetArray(J11, mm:nmax, mm:nmax)
-    OffsetJ12 = OffsetArray(J12, mm:nmax, mm:nmax)
-    OffsetJ21 = OffsetArray(J21, mm:nmax, mm:nmax)
-    OffsetJ22 = OffsetArray(J22, mm:nmax, mm:nmax)
-    OffsetRgJ11 = OffsetArray(RgJ11, mm:nmax, mm:nmax)
-    OffsetRgJ12 = OffsetArray(RgJ12, mm:nmax, mm:nmax)
-    OffsetRgJ21 = OffsetArray(RgJ21, mm:nmax, mm:nmax)
-    OffsetRgJ22 = OffsetArray(RgJ22, mm:nmax, mm:nmax)
+    OffsetJ₁₁ = OffsetArray(J₁₁, mm:nmax, mm:nmax)
+    OffsetJ₁₂ = OffsetArray(J₁₂, mm:nmax, mm:nmax)
+    OffsetJ₂₁ = OffsetArray(J₂₁, mm:nmax, mm:nmax)
+    OffsetJ₂₂ = OffsetArray(J₂₂, mm:nmax, mm:nmax)
+    OffsetRgJ₁₁ = OffsetArray(RgJ₁₁, mm:nmax, mm:nmax)
+    OffsetRgJ₁₂ = OffsetArray(RgJ₁₂, mm:nmax, mm:nmax)
+    OffsetRgJ₂₁ = OffsetArray(RgJ₂₁, mm:nmax, mm:nmax)
+    OffsetRgJ₂₂ = OffsetArray(RgJ₂₂, mm:nmax, mm:nmax)
 
     nm = nmax - mm + 1
     Threads.@threads for nn in 0:(nm * nm - 1)
-        n2 = nn ÷ nm + mm
-        n1 = nn % nm + mm
+        n₂ = nn ÷ nm + mm
+        n₁ = nn % nm + mm
         for i in 1:ngss
-            if !(sym && (n1 + n2) % 2 == 0)
-                pττp = p[i, n1] * τ[i, n2] + p[i, n2] * τ[i, n1]
-                p₁d₂ = p[i, n1] * d[i, n2]
+            if !(sym && (n₁ + n₂) % 2 == 0)
+                pττp = p[i, n₁] * τ[i, n₂] + p[i, n₂] * τ[i, n₁]
+                p₁d₂ = p[i, n₁] * d[i, n₂]
 
-                OffsetJ11[n1, n2] += wr2[i] * hkr[i, n1] * jkr_s[i, n2] * pττp
+                OffsetJ₁₁[n₁, n₂] += wr²[i] * hkr[i, n₁] * jkₛr[i, n₂] * pττp
 
-                OffsetJ22[n1, n2] +=
-                    wr2[i] * (
-                        dhkr[i, n1] * djkr_s[i, n2] * pττp +
+                OffsetJ₂₂[n₁, n₂] +=
+                    wr²[i] * (
+                        dhkr[i, n₁] * djkₛr[i, n₂] * pττp +
                         drr[i] *
-                        (
-                            an[n1] * hkr[i, n1] * kr1[i] * djkr_s[i, n2] +
-                            an[n2] * jkr_s[i, n2] * kr_s1[i] * dhkr[i, n1]
-                        ) *
+                        (an[n₁] * hkr[i, n₁] * kr⁻¹[i] * djkₛr[i, n₂] + an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * dhkr[i, n₁]) *
                         p₁d₂
                     )
 
-                OffsetRgJ11[n1, n2] += wr2[i] * jkr[i, n1] * jkr_s[i, n2] * pττp
+                OffsetRgJ₁₁[n₁, n₂] += wr²[i] * jkr[i, n₁] * jkₛr[i, n₂] * pττp
 
-                OffsetRgJ22[n1, n2] +=
-                    wr2[i] * (
-                        djkr[i, n1] * djkr_s[i, n2] * pττp +
+                OffsetRgJ₂₂[n₁, n₂] +=
+                    wr²[i] * (
+                        djkr[i, n₁] * djkₛr[i, n₂] * pττp +
                         drr[i] *
-                        (
-                            an[n1] * jkr[i, n1] * kr1[i] * djkr_s[i, n2] +
-                            an[n2] * jkr_s[i, n2] * kr_s1[i] * djkr[i, n1]
-                        ) *
+                        (an[n₁] * jkr[i, n₁] * kr⁻¹[i] * djkₛr[i, n₂] + an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * djkr[i, n₁]) *
                         p₁d₂
                     )
             end
 
-            if !(sym && (n1 + n2) % 2 == 1)
-                ppττ = p[i, n1] * p[i, n2] + τ[i, n1] * τ[i, n2]
-                d₁τ₂ = d[i, n1] * τ[i, n2]
-                d₂τ₁ = d[i, n2] * τ[i, n1]
+            if !(sym && (n₁ + n₂) % 2 == 1)
+                ppττ = p[i, n₁] * p[i, n₂] + τ[i, n₁] * τ[i, n₂]
+                d₁τ₂ = d[i, n₁] * τ[i, n₂]
+                d₂τ₁ = d[i, n₂] * τ[i, n₁]
 
-                OffsetJ12[n1, n2] +=
-                    wr2[i] * jkr_s[i, n2] * (dhkr[i, n1] * ppττ + drr[i] * an[n1] * hkr[i, n1] * kr1[i] * d₁τ₂)
+                OffsetJ₁₂[n₁, n₂] +=
+                    wr²[i] * jkₛr[i, n₂] * (dhkr[i, n₁] * ppττ + drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                OffsetJ21[n1, n2] +=
-                    wr2[i] * hkr[i, n1] * (djkr_s[i, n2] * ppττ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
+                OffsetJ₂₁[n₁, n₂] +=
+                    wr²[i] * hkr[i, n₁] * (djkₛr[i, n₂] * ppττ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
 
-                OffsetRgJ12[n1, n2] +=
-                    wr2[i] * jkr_s[i, n2] * (djkr[i, n1] * ppττ + drr[i] * an[n1] * jkr[i, n1] * kr1[i] * d₁τ₂)
+                OffsetRgJ₁₂[n₁, n₂] +=
+                    wr²[i] * jkₛr[i, n₂] * (djkr[i, n₁] * ppττ + drr[i] * an[n₁] * jkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                OffsetRgJ21[n1, n2] +=
-                    wr2[i] * jkr[i, n1] * (djkr_s[i, n2] * ppττ + drr[i] * an[n2] * jkr_s[i, n2] * kr_s1[i] * d₂τ₁)
+                OffsetRgJ₂₁[n₁, n₂] +=
+                    wr²[i] * jkr[i, n₁] * (djkₛr[i, n₂] * ppττ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
             end
         end
     end
 
     ann = view(ann, mm:nmax, mm:nmax)
-    @. J11 *= -1 * ann
-    @. J12 *= -1im * ann
-    @. J21 *= 1im * ann
-    @. J22 *= -1 * ann
+    @. J₁₁ *= -1 * ann
+    @. J₁₂ *= -1im * ann
+    @. J₂₁ *= 1im * ann
+    @. J₂₂ *= -1 * ann
 
-    @. RgJ11 *= -1 * ann
-    @. RgJ12 *= -1im * ann
-    @. RgJ21 *= 1im * ann
-    @. RgJ22 *= -1 * ann
+    @. RgJ₁₁ *= -1 * ann
+    @. RgJ₁₂ *= -1im * ann
+    @. RgJ₂₁ *= 1im * ann
+    @. RgJ₂₂ *= -1 * ann
 
     k = 2 * T(π) / scatterer.λ
-    k_s = k * scatterer.m
-    kk = k^2
-    kk_s = k * k_s
+    kₛ = k * scatterer.m
+    k² = k^2
+    kkₛ = k * kₛ
 
     Q = view(info.Q, 1:(2nm), 1:(2nm))
-    Q11 = view(Q, 1:nm, 1:nm)
-    Q12 = view(Q, 1:nm, (nm + 1):(2nm))
-    Q21 = view(Q, (nm + 1):(2nm), 1:nm)
-    Q22 = view(Q, (nm + 1):(2nm), (nm + 1):(2nm))
+    Q₁₁ = view(Q, 1:nm, 1:nm)
+    Q₁₂ = view(Q, 1:nm, (nm + 1):(2nm))
+    Q₂₁ = view(Q, (nm + 1):(2nm), 1:nm)
+    Q₂₂ = view(Q, (nm + 1):(2nm), (nm + 1):(2nm))
     RgQ = view(info.RgQ, 1:(2nm), 1:(2nm))
-    RgQ11 = view(RgQ, 1:nm, 1:nm)
-    RgQ12 = view(RgQ, 1:nm, (nm + 1):(2nm))
-    RgQ21 = view(RgQ, (nm + 1):(2nm), 1:nm)
-    RgQ22 = view(RgQ, (nm + 1):(2nm), (nm + 1):(2nm))
+    RgQ₁₁ = view(RgQ, 1:nm, 1:nm)
+    RgQ₁₂ = view(RgQ, 1:nm, (nm + 1):(2nm))
+    RgQ₂₁ = view(RgQ, (nm + 1):(2nm), 1:nm)
+    RgQ₂₂ = view(RgQ, (nm + 1):(2nm), (nm + 1):(2nm))
     fill!(Q, zero(eltype(Q)))
     fill!(RgQ, zero(eltype(RgQ)))
 
     # Since T = -RgQ⋅Q', the coefficient -i of Q and RgQ can be cancelled out.
 
-    @. Q11 = kk_s * J21 + kk * J12
-    @. Q12 = kk_s * J11 + kk * J22
-    @. Q21 = kk_s * J22 + kk * J11
-    @. Q22 = kk_s * J12 + kk * J21
+    @. Q₁₁ = kkₛ * J₂₁ + k² * J₁₂
+    @. Q₁₂ = kkₛ * J₁₁ + k² * J₂₂
+    @. Q₂₁ = kkₛ * J₂₂ + k² * J₁₁
+    @. Q₂₂ = kkₛ * J₁₂ + k² * J₂₁
 
-    @. RgQ11 = kk_s * RgJ21 + kk * RgJ12
-    @. RgQ12 = kk_s * RgJ11 + kk * RgJ22
-    @. RgQ21 = kk_s * RgJ22 + kk * RgJ11
-    @. RgQ22 = kk_s * RgJ12 + kk * RgJ21
+    @. RgQ₁₁ = kkₛ * RgJ₂₁ + k² * RgJ₁₂
+    @. RgQ₁₂ = kkₛ * RgJ₁₁ + k² * RgJ₂₂
+    @. RgQ₂₁ = kkₛ * RgJ₂₂ + k² * RgJ₁₁
+    @. RgQ₂₂ = kkₛ * RgJ₁₂ + k² * RgJ₂₁
 
     LinearAlgebra.inv!(lu!(Q))
     Tm = RgQ * Q

@@ -40,10 +40,10 @@
                     refractive_index = m,
                     axis_ratio = a_to_c,
                 )
-                r2, drr = TMatrix.Wrapper.Fixed.rsp1(ngauss, rev, a_to_c)
+                r², drr = TMatrix.Wrapper.Fixed.rsp1(ngauss, rev, a_to_c)
                 r, dr = TMatrix.calc_r(scatterer, ngauss)
 
-                all(r .^ 2 .≈ r2) && all(dr ./ r .≈ drr)
+                all(r .^ 2 .≈ r²) && all(dr ./ r .≈ drr)
             end
         end
 
@@ -63,10 +63,10 @@
                     refractive_index = m,
                     axis_ratio = d_to_h,
                 )
-                r2, drr = TMatrix.Wrapper.Fixed.rsp3(ngauss, rev, d_to_h)
+                r², drr = TMatrix.Wrapper.Fixed.rsp3(ngauss, rev, d_to_h)
                 r, dr = TMatrix.calc_r(scatterer, ngauss)
 
-                all(r .^ 2 .≈ r2) && all(dr ./ r .≈ drr)
+                all(r .^ 2 .≈ r²) && all(dr ./ r .≈ drr)
             end
         end
 
@@ -88,10 +88,10 @@
                     axis_ratio = ε,
                     n = ncheb,
                 )
-                r2, drr = TMatrix.Wrapper.Fixed.rsp2(ngauss, rev, ε, ncheb)
+                r², drr = TMatrix.Wrapper.Fixed.rsp2(ngauss, rev, ε, ncheb)
                 r, dr = TMatrix.calc_r(scatterer, ngauss)
 
-                all(r .^ 2 .≈ r2) && all(dr ./ r .≈ drr)
+                all(r .^ 2 .≈ r²) && all(dr ./ r .≈ drr)
             end
         end
     end
@@ -288,18 +288,18 @@
 
                 np = -1
                 x, _ = TMatrix.Wrapper.Fixed.constant(ngauss, nmax, np, a_to_c)
-                _, _, _, _, _, ddr, drr, dri, jkr0, djkr0, ykr0, dykr0, jkr_s0, djkr_s0 =
+                _, _, _, _, _, ddr, drr, dri, jkr0, djkr0, ykr0, dykr0, jkₛr0, djkₛr0 =
                     TMatrix.Wrapper.Fixed.vary(x, λ, m, rev, a_to_c, np, ngauss, nmax)
-                _, _, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
+                _, _, kr1, kₛr1, jkr, djkr, ykr, dykr, jkₛr, djkₛr = TMatrix.vary(scatterer, ngauss, nmax)
 
                 all(ddr[1:ngauss] .≈ kr1) &&
-                    all((drr + 1.0im * dri)[1:ngauss] .≈ kr_s1) &&
+                    all((drr + 1.0im * dri)[1:ngauss] .≈ kₛr1) &&
                     all(jkr0 .≈ jkr) &&
                     all(djkr0 .≈ djkr) &&
                     all(ykr0 .≈ ykr) &&
                     all(dykr0 .≈ dykr) &&
-                    all(jkr_s0 .≈ jkr_s) &&
-                    all(djkr_s0 .≈ djkr_s)
+                    all(jkₛr0 .≈ jkₛr) &&
+                    all(djkₛr0 .≈ djkₛr)
             end
         end
 
@@ -316,18 +316,18 @@
 
                 np = -2
                 x, _ = TMatrix.Wrapper.Fixed.constant(ngauss, nmax, np, d_to_h)
-                _, _, _, _, _, ddr, drr, dri, jkr0, djkr0, ykr0, dykr0, jkr_s0, djkr_s0 =
+                _, _, _, _, _, ddr, drr, dri, jkr0, djkr0, ykr0, dykr0, jkₛr0, djkₛr0 =
                     TMatrix.Wrapper.Fixed.vary(x, λ, m, rev, d_to_h, np, ngauss, nmax)
-                _, _, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
+                _, _, kr1, kₛr1, jkr, djkr, ykr, dykr, jkₛr, djkₛr = TMatrix.vary(scatterer, ngauss, nmax)
 
                 all(ddr[1:ngauss] .≈ kr1) &&
-                    all((drr + 1.0im * dri)[1:ngauss] .≈ kr_s1) &&
+                    all((drr + 1.0im * dri)[1:ngauss] .≈ kₛr1) &&
                     all(jkr0 .≈ jkr) &&
                     all(djkr0 .≈ djkr) &&
                     all(ykr0 .≈ ykr) &&
                     all(dykr0 .≈ dykr) &&
-                    all(jkr_s0 .≈ jkr_s) &&
-                    all(djkr_s0 .≈ djkr_s)
+                    all(jkₛr0 .≈ jkₛr) &&
+                    all(djkₛr0 .≈ djkₛr)
             end
         end
 
@@ -347,18 +347,18 @@
 
                 np = ncheb
                 x, _ = TMatrix.Wrapper.Fixed.constant(ngauss, nmax, np, ε)
-                _, _, _, _, _, ddr, drr, dri, jkr0, djkr0, ykr0, dykr0, jkr_s0, djkr_s0 =
+                _, _, _, _, _, ddr, drr, dri, jkr0, djkr0, ykr0, dykr0, jkₛr0, djkₛr0 =
                     TMatrix.Wrapper.Fixed.vary(x, λ, m, rev, ε, np, ngauss, nmax)
-                _, _, kr1, kr_s1, jkr, djkr, ykr, dykr, jkr_s, djkr_s = TMatrix.vary(scatterer, ngauss, nmax)
+                _, _, kr1, kₛr1, jkr, djkr, ykr, dykr, jkₛr, djkₛr = TMatrix.vary(scatterer, ngauss, nmax)
 
                 all(ddr[1:ngauss] .≈ kr1) &&
-                    all((drr + 1.0im * dri)[1:ngauss] .≈ kr_s1) &&
+                    all((drr + 1.0im * dri)[1:ngauss] .≈ kₛr1) &&
                     all(jkr0 .≈ jkr) &&
                     all(djkr0 .≈ djkr) &&
                     all(ykr0 .≈ ykr) &&
                     all(dykr0 .≈ dykr) &&
-                    all(jkr_s0 .≈ jkr_s) &&
-                    all(djkr_s0 .≈ djkr_s)
+                    all(jkₛr0 .≈ jkₛr) &&
+                    all(djkₛr0 .≈ djkₛr)
             end
         end
     end
