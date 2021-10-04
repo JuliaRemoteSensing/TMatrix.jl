@@ -1,4 +1,4 @@
-@enum Shape SHAPE_SPHEROID SHAPE_CYLINDER SHAPE_CHEBYSHEV
+@enum Shape SHAPE_SPHEROID SHAPE_CYLINDER SHAPE_BICONE SHAPE_CHEBYSHEV
 @enum RadiusType RADIUS_EQUAL_VOLUME RADIUS_EQUAL_AREA RADIUS_MAXIMUM
 
 const DEFAULT_NCAP = Ref{Int64}(100)
@@ -223,6 +223,25 @@ struct Cylinder{T<:Real,CT<:Number,RV,RM,CV,CM} <: AbstractScatterer{T,CT}
 end
 
 @doc raw"""
+A bicone scatterer.
+
+Attributes:
+
+- `rev`: The equivalent volume radius.
+- `m`: The complex refractive index.
+- `d_to_h`: The diameter-to-height ratio $D/H$.
+- `λ`: The wavelength of the incident wave.
+- `info`: The accompanied information.
+"""
+struct Bicone{T<:Real,CT<:Number,RV,RM,CV,CM} <: AbstractScatterer{T,CT}
+    rev::T
+    m::CT
+    d_to_h::T
+    λ::T
+    info::ScattererInfo{RV,RM,CV,CM}
+end
+
+@doc raw"""
 A Chebyshev scatterer defined by
 
     $r(\theta, \phi)=r_0(1+\varepsilon T_n(\cos\theta))$
@@ -289,6 +308,7 @@ function Scatterer(
     f13 = T(1 // 3)
     f23 = T(2 // 3)
     f43 = T(4 // 3)
+    f16 = T(1 // 6)
 
     if radius_type == RADIUS_EQUAL_VOLUME
         rev = r
@@ -307,6 +327,9 @@ function Scatterer(
         elseif shape == SHAPE_CYLINDER
             e = axis_ratio
             ratio = ∛(f32 / e) / √((e + 2) / 2e)
+        elseif shape == SHAPE_BICONE
+            e = axis_ratio
+            ratio = (2e)^f16 / √(e + √(1 + e^2))
         elseif shape == SHAPE_CHEBYSHEV
             e = axis_ratio
             en = e * n
@@ -335,6 +358,8 @@ function Scatterer(
             rev = axis_ratio > 1.0 ? r / ∛axis_ratio : r * axis_ratio^f23
         elseif shape == SHAPE_CYLINDER
             rev = axis_ratio > 1.0 ? r * ∛(f32 / axis_ratio) : r * ∛(f32 * axis_ratio^2)
+        elseif shape == SHAPE_BICONE
+            rev = axis_ratio > 1.0 ? r * ∛(f12 / axis_ratio) : r * ∛(axis_ratio^2 * f12)
         elseif shape == SHAPE_CHEBYSHEV
             e = axis_ratio
             en = e * n
@@ -358,6 +383,8 @@ function Scatterer(
         return Spheroid(rev, refractive_index, axis_ratio, λ, ScattererInfo(T))
     elseif shape == SHAPE_CYLINDER
         return Cylinder(rev, refractive_index, axis_ratio, λ, ScattererInfo(T))
+    elseif shape == SHAPE_BICONE
+        return Bicone(rev, refractive_index, axis_ratio, λ, ScattererInfo(T))
     elseif shape == SHAPE_CHEBYSHEV
         return Chebyshev(rev, refractive_index, axis_ratio, n, λ, ScattererInfo(T))
     end
@@ -366,6 +393,7 @@ end
 function has_symmetric_plane(scatterer::AbstractScatterer)
     return typeof(scatterer) <: Spheroid ||
            typeof(scatterer) <: Cylinder ||
+           typeof(scatterer) <: Bicone ||
            (typeof(scatterer) <: Chebyshev && scatterer.n % 2 == 0)
 end
 
@@ -1123,6 +1151,13 @@ function theta_split!(
         w[(ng1 + 1):ng] .= -0.5xx .* w2
         x[(ng + 1):ngauss] .= (-1.0) .* x[ng:-1:1]
         w[(ng + 1):ngauss] .= w[ng:-1:1]
+    elseif typeof(scatterer) <: Bicone
+        ng = ngauss ÷ 2
+        x1, w1 = gausslegendre(T, ng)
+        @. x[1:ng] = 0.5(x1 - 1)
+        @. w[1:ng] = 0.5w1
+        @. x[(ng + 1):ngauss] = (-1) * x[ng:-1:1]
+        @. w[(ng + 1):ngauss] = w[ng:-1:1]
     else
         x0, w0 = gausslegendre(T, ngauss)
         x .= x0
@@ -1157,7 +1192,7 @@ function calc_r!(
 
     if typeof(scatterer) <: Cylinder
         if ngauss % 2 != 0
-            error("Constraint violated: ngauss should be even for cylinders")
+            throw(DomainError(ngauss, "Constraint violated: ngauss should be even for cylinders"))
         end
 
         e = scatterer.d_to_h
@@ -1181,7 +1216,7 @@ function calc_r!(
 
     elseif typeof(scatterer) <: Spheroid
         if ngauss % 2 != 0
-            error("Constraint violated: ngauss should be even for spheroids")
+            throw(DomainError(ngauss, "Constraint violated: ngauss should be even for spheroids"))
         end
 
         e = scatterer.a_to_c
@@ -1195,11 +1230,33 @@ function calc_r!(
             dr[i] = r[i]^3 * cosθ * sinθ * (e^2 - 1.0) / a^2
             dr[ngauss + 1 - i] = -dr[i]
         end
+    elseif typeof(scatterer) <: Bicone
+        if ngauss % 2 != 0
+            throw(DomainError(ngauss, "Constraint violated: ngauss should be even for bicones"))
+        end
+
+        e = scatterer.d_to_h
+        h = rev * ∛(2 / e^2)
+        r₀ = h * e
+        α = atan(1 / e)
+        sinα = sin(α)
+
+        @simd for i in 1:(ngauss ÷ 2)
+            cosθ = abs(x[i])
+            θ = acos(cosθ)
+            β = π - α - θ
+            sinβ = sin(β)
+            cosβ = cos(β)
+            r[i] = r₀ / sinβ * sinα
+            r[ngauss + 1 - i] = r[i]
+            dr[i] = -r[i] * cosβ / sinβ
+            dr[ngauss + 1 - i] = -dr[i]
+        end
     else
         @assert typeof(scatterer) <: Chebyshev
         e = scatterer.ε
         n = scatterer.n
-        dn = float(n)
+        dn = T(n)
 
         a = 1.5e^2 * (4.0dn^2 - 2.0) / (4.0dn^2 - 1.0) + 1.0
 
@@ -1485,7 +1542,12 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
     @. RgQ₁₁ = kkₛ * RgJ₂₁ + k² * RgJ₁₂
     @. RgQ₂₂ = kkₛ * RgJ₁₂ + k² * RgJ₂₁
 
-    LinearAlgebra.inv!(lu!(Q))
+    try
+        LinearAlgebra.inv!(lu!(Q))
+    catch e
+        Q = inv(Q)
+    end
+
     T0 = RgQ * Q
     T0 .*= -1
 

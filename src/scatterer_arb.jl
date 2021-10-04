@@ -70,6 +70,13 @@ function theta_split!(
         w[(ng1 + 1):ng] .= -0.5xx .* w2
         x[(ng + 1):ngauss] .= (-1.0) .* x[ng:-1:1]
         w[(ng + 1):ngauss] .= w[ng:-1:1]
+    elseif typeof(scatterer) <: Bicone
+        ng = ngauss ÷ 2
+        x1, w1 = gausslegendre(Arb, ng)
+        @. x[1:ng] = 0.5(x1 - 1)
+        @. w[1:ng] = 0.5w1
+        @. x[(ng + 1):ngauss] = (-1) * x[ng:-1:1]
+        @. w[(ng + 1):ngauss] = w[ng:-1:1]
     else
         gausslegendre!(Arb, ngauss, x, w)
     end
@@ -145,6 +152,28 @@ function calc_r!(
             Arblib.mul!(dr[i], dr[i], ratio)
             Arblib.div!(dr[i], dr[i], a²)
             Arblib.mul!(dr[ngauss + 1 - i], dr[i], ARB_ONE_NEG)
+        end
+    elseif typeof(scatterer) <: Bicone
+        if ngauss % 2 != 0
+            throw(DomainError(ngauss, "Constraint violated: ngauss should be even for bicones"))
+        end
+
+        e = scatterer.d_to_h
+        h = rev * ∛(2 / e^2)
+        r₀ = h * e
+        α = atan(1 / e)
+        sinα = sin(α)
+
+        @simd for i in 1:(ngauss ÷ 2)
+            cosθ = abs(x[i])
+            θ = acos(cosθ)
+            β = π - α - θ
+            sinβ = sin(β)
+            cosβ = cos(β)
+            r[i] = r₀ / sinβ * sinα
+            r[ngauss + 1 - i] = r[i]
+            dr[i] = -r[i] * cosβ / sinβ
+            dr[ngauss + 1 - i] = -dr[i]
         end
     else
         @assert typeof(scatterer) <: Chebyshev
