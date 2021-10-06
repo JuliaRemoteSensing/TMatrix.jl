@@ -390,12 +390,10 @@ function Scatterer(
     end
 end
 
-function has_symmetric_plane(scatterer::AbstractScatterer)
-    return typeof(scatterer) <: Spheroid ||
-           typeof(scatterer) <: Cylinder ||
-           typeof(scatterer) <: Bicone ||
-           (typeof(scatterer) <: Chebyshev && scatterer.n % 2 == 0)
-end
+has_symmetric_plane(spheroid::Spheroid) = true
+has_symmetric_plane(cylinder::Cylinder) = true
+has_symmetric_plane(bicone::Bicone) = true
+has_symmetric_plane(chebyshev::Chebyshev) = chebyshev.n % 2 == 0
 
 @doc raw"""
 ```
@@ -1132,37 +1130,39 @@ function calc_scattering_matrix(
     return F₁₁, F₂₂, F₃₃, F₄₄, F₁₂, F₃₄
 end
 
+function theta_split!(scatterer::Cylinder{T}, ngauss::Int64, x::AbstractArray, w::AbstractArray) where {T<:Real}
+    ng = ngauss ÷ 2
+    ng1 = ng ÷ 2
+    ng2 = ng - ng1
+    x1, w1 = gausslegendre(T, ng1)
+    x2, w2 = gausslegendre(T, ng2)
+    xx = -cos(atan(scatterer.d_to_h))
+    x[1:ng1] .= 0.5(xx + 1.0) .* x1 .+ 0.5(xx - 1.0)
+    w[1:ng1] .= 0.5(xx + 1.0) .* w1
+    x[(ng1 + 1):ng] .= -0.5xx .* x2 .+ 0.5xx
+    w[(ng1 + 1):ng] .= -0.5xx .* w2
+    x[(ng + 1):ngauss] .= (-1.0) .* x[ng:-1:1]
+    return w[(ng + 1):ngauss] .= w[ng:-1:1]
+end
+
+function theta_split!(scatterer::Bicone{T}, ngauss::Int64, x::AbstractArray, w::AbstractArray) where {T<:Real}
+    ng = ngauss ÷ 2
+    x1, w1 = gausslegendre(T, ng)
+    @. x[1:ng] = 0.5(x1 - 1)
+    @. w[1:ng] = 0.5w1
+    @. x[(ng + 1):ngauss] = (-1) * x[ng:-1:1]
+    @. w[(ng + 1):ngauss] = w[ng:-1:1]
+end
+
 function theta_split!(
     scatterer::AbstractScatterer{T},
     ngauss::Int64,
     x::AbstractArray,
     w::AbstractArray,
 ) where {T<:Real}
-    if typeof(scatterer) <: Cylinder
-        ng = ngauss ÷ 2
-        ng1 = ng ÷ 2
-        ng2 = ng - ng1
-        x1, w1 = gausslegendre(T, ng1)
-        x2, w2 = gausslegendre(T, ng2)
-        xx = -cos(atan(scatterer.d_to_h))
-        x[1:ng1] .= 0.5(xx + 1.0) .* x1 .+ 0.5(xx - 1.0)
-        w[1:ng1] .= 0.5(xx + 1.0) .* w1
-        x[(ng1 + 1):ng] .= -0.5xx .* x2 .+ 0.5xx
-        w[(ng1 + 1):ng] .= -0.5xx .* w2
-        x[(ng + 1):ngauss] .= (-1.0) .* x[ng:-1:1]
-        w[(ng + 1):ngauss] .= w[ng:-1:1]
-    elseif typeof(scatterer) <: Bicone
-        ng = ngauss ÷ 2
-        x1, w1 = gausslegendre(T, ng)
-        @. x[1:ng] = 0.5(x1 - 1)
-        @. w[1:ng] = 0.5w1
-        @. x[(ng + 1):ngauss] = (-1) * x[ng:-1:1]
-        @. w[(ng + 1):ngauss] = w[ng:-1:1]
-    else
-        x0, w0 = gausslegendre(T, ngauss)
-        x .= x0
-        w .= w0
-    end
+    x0, w0 = gausslegendre(T, ngauss)
+    x .= x0
+    return w .= w0
 end
 
 function theta_split(scatterer::AbstractScatterer{T}, ngauss::Int64) where {T<:Real}
@@ -1180,7 +1180,7 @@ calc_r!(scatterer::AbstractScatterer{T}, ngauss::Int64, x::AbstractArray{T}, w::
 Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` points for a given scatterer, in place.
 """
 function calc_r!(
-    scatterer::AbstractScatterer{T},
+    scatterer::Cylinder{T},
     ngauss::Int64,
     x::AbstractArray,
     w::AbstractArray,
@@ -1189,88 +1189,105 @@ function calc_r!(
 ) where {T<:Real}
     theta_split!(scatterer, ngauss, x, w)
     rev = scatterer.rev
+    e = scatterer.d_to_h
+    h = rev * ∛(2 / (3e^2))
+    d = h * e
 
-    if typeof(scatterer) <: Cylinder
-        if ngauss % 2 != 0
-            throw(DomainError(ngauss, "Constraint violated: ngauss should be even for cylinders"))
+    @simd for i in 1:(ngauss ÷ 2)
+        cosθ = abs(x[i])
+        sinθ = √(1 - cosθ^2)
+        if h / cosθ < d / sinθ
+            r[i] = h / cosθ
+            dr[i] = h * sinθ / cosθ^2
+        else
+            r[i] = d / sinθ
+            dr[i] = -d * cosθ / sinθ^2
         end
+        r[ngauss + 1 - i] = r[i]
+        dr[ngauss + 1 - i] = dr[i]
+        dr[i] = -dr[i]
+    end
+end
 
-        e = scatterer.d_to_h
-        h = rev * ∛(2 / (3e^2))
-        d = h * e
+function calc_r!(
+    scatterer::Spheroid{T},
+    ngauss::Int64,
+    x::AbstractArray,
+    w::AbstractArray,
+    r::AbstractArray,
+    dr::AbstractArray,
+) where {T<:Real}
+    theta_split!(scatterer, ngauss, x, w)
+    rev = scatterer.rev
+    e = scatterer.a_to_c
+    a = rev * ∛e
 
-        @simd for i in 1:(ngauss ÷ 2)
-            cosθ = abs(x[i])
-            sinθ = √(1 - cosθ^2)
-            if h / cosθ < d / sinθ
-                r[i] = h / cosθ
-                dr[i] = h * sinθ / cosθ^2
-            else
-                r[i] = d / sinθ
-                dr[i] = -d * cosθ / sinθ^2
-            end
-            r[ngauss + 1 - i] = r[i]
-            dr[ngauss + 1 - i] = dr[i]
-            dr[i] = -dr[i]
-        end
+    @simd for i in 1:(ngauss ÷ 2)
+        cosθ = x[i]
+        sinθ = √(1.0 - cosθ^2)
+        r[i] = a * √(1.0 / (e^2 * cosθ^2 + sinθ^2))
+        r[ngauss + 1 - i] = r[i]
+        dr[i] = r[i]^3 * cosθ * sinθ * (e^2 - 1.0) / a^2
+        dr[ngauss + 1 - i] = -dr[i]
+    end
+end
 
-    elseif typeof(scatterer) <: Spheroid
-        if ngauss % 2 != 0
-            throw(DomainError(ngauss, "Constraint violated: ngauss should be even for spheroids"))
-        end
+function calc_r!(
+    scatterer::Bicone{T},
+    ngauss::Int64,
+    x::AbstractArray,
+    w::AbstractArray,
+    r::AbstractArray,
+    dr::AbstractArray,
+) where {T<:Real}
+    theta_split!(scatterer, ngauss, x, w)
+    rev = scatterer.rev
+    e = scatterer.d_to_h
+    h = rev * ∛(2 / e^2)
+    r₀ = h * e
+    α = atan(1 / e)
+    sinα = sin(α)
 
-        e = scatterer.a_to_c
-        a = rev * ∛e
+    @simd for i in 1:(ngauss ÷ 2)
+        cosθ = abs(x[i])
+        θ = acos(cosθ)
+        β = π - α - θ
+        sinβ = sin(β)
+        cosβ = cos(β)
+        r[i] = r₀ / sinβ * sinα
+        r[ngauss + 1 - i] = r[i]
+        dr[i] = -r[i] * cosβ / sinβ
+        dr[ngauss + 1 - i] = -dr[i]
+    end
+end
 
-        @simd for i in 1:(ngauss ÷ 2)
-            cosθ = x[i]
-            sinθ = √(1.0 - cosθ^2)
-            r[i] = a * √(1.0 / (e^2 * cosθ^2 + sinθ^2))
-            r[ngauss + 1 - i] = r[i]
-            dr[i] = r[i]^3 * cosθ * sinθ * (e^2 - 1.0) / a^2
-            dr[ngauss + 1 - i] = -dr[i]
-        end
-    elseif typeof(scatterer) <: Bicone
-        if ngauss % 2 != 0
-            throw(DomainError(ngauss, "Constraint violated: ngauss should be even for bicones"))
-        end
+function calc_r!(
+    scatterer::Chebyshev{T},
+    ngauss::Int64,
+    x::AbstractArray,
+    w::AbstractArray,
+    r::AbstractArray,
+    dr::AbstractArray,
+) where {T<:Real}
+    theta_split!(scatterer, ngauss, x, w)
+    rev = scatterer.rev
+    @assert typeof(scatterer) <: Chebyshev
+    e = scatterer.ε
+    n = scatterer.n
+    dn = T(n)
 
-        e = scatterer.d_to_h
-        h = rev * ∛(2 / e^2)
-        r₀ = h * e
-        α = atan(1 / e)
-        sinα = sin(α)
+    a = 1.5e^2 * (4.0dn^2 - 2.0) / (4.0dn^2 - 1.0) + 1.0
 
-        @simd for i in 1:(ngauss ÷ 2)
-            cosθ = abs(x[i])
-            θ = acos(cosθ)
-            β = π - α - θ
-            sinβ = sin(β)
-            cosβ = cos(β)
-            r[i] = r₀ / sinβ * sinα
-            r[ngauss + 1 - i] = r[i]
-            dr[i] = -r[i] * cosβ / sinβ
-            dr[ngauss + 1 - i] = -dr[i]
-        end
-    else
-        @assert typeof(scatterer) <: Chebyshev
-        e = scatterer.ε
-        n = scatterer.n
-        dn = T(n)
+    if n % 2 == 0
+        a -= 3.0e * (1.0 + 0.25e^2) / (dn^2 - 1.0) + 0.25e^3 / (9.0dn^2 - 1.0)
+    end
 
-        a = 1.5e^2 * (4.0dn^2 - 2.0) / (4.0dn^2 - 1.0) + 1.0
+    r0 = rev / ∛a
 
-        if n % 2 == 0
-            a -= 3.0e * (1.0 + 0.25e^2) / (dn^2 - 1.0) + 0.25e^3 / (9.0dn^2 - 1.0)
-        end
-
-        r0 = rev / ∛a
-
-        @simd for i in 1:ngauss
-            xi = acos(x[i]) * n
-            r[i] = r0 * (1.0 + e * cos(xi))
-            dr[i] = -r0 * e * n * sin(xi)
-        end
+    @simd for i in 1:ngauss
+        xi = acos(x[i]) * n
+        r[i] = r0 * (1.0 + e * cos(xi))
+        dr[i] = -r0 * e * n * sin(xi)
     end
 end
 
@@ -1448,6 +1465,8 @@ function vary(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where
 end
 
 function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) where {T<:Real}
+    @assert ngauss % 2 == 0
+
     CT = Complex{T}
 
     sym = has_symmetric_plane(scatterer)
@@ -1555,6 +1574,8 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
 end
 
 function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::Int64;) where {T<:Real}
+    @assert ngauss % 2 == 0
+
     sym = has_symmetric_plane(scatterer)
     update!(scatterer, ngauss, nmax)
 

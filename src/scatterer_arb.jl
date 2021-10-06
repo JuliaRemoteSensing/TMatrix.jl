@@ -51,39 +51,75 @@ function ScattererInfo(T::Type{Arb})
     )
 end
 
+function theta_split!(scatterer::Cylinder{Arb}, ngauss::Int64, x::Arblib.ArbVectorLike, w::Arblib.ArbVectorLike)
+    ng = ngauss ÷ 2
+    ng1 = ng ÷ 2
+    ng2 = ng - ng1
+    x1, w1 = gausslegendre(Arb, ng1)
+    x2, w2 = gausslegendre(Arb, ng2)
+    xx = -cos(atan(scatterer.d_to_h))
+    x[1:ng1] .= 0.5(xx + 1.0) .* x1 .+ 0.5(xx - 1.0)
+    w[1:ng1] .= 0.5(xx + 1.0) .* w1
+    x[(ng1 + 1):ng] .= -0.5xx .* x2 .+ 0.5xx
+    w[(ng1 + 1):ng] .= -0.5xx .* w2
+    x[(ng + 1):ngauss] .= (-1.0) .* x[ng:-1:1]
+    return w[(ng + 1):ngauss] .= w[ng:-1:1]
+end
+
+function theta_split!(scatterer::Bicone{Arb}, ngauss::Int64, x::Arblib.ArbVectorLike, w::Arblib.ArbVectorLike)
+    ng = ngauss ÷ 2
+    x1, w1 = gausslegendre(Arb, ng)
+    @. x[1:ng] = 0.5(x1 - 1)
+    @. w[1:ng] = 0.5w1
+    @. x[(ng + 1):ngauss] = (-1) * x[ng:-1:1]
+    @. w[(ng + 1):ngauss] = w[ng:-1:1]
+end
+
 function theta_split!(
     scatterer::AbstractScatterer{Arb},
     ngauss::Int64,
     x::Arblib.ArbVectorLike,
     w::Arblib.ArbVectorLike,
 )
-    if typeof(scatterer) <: Cylinder
-        ng = ngauss ÷ 2
-        ng1 = ng ÷ 2
-        ng2 = ng - ng1
-        x1, w1 = gausslegendre(Arb, ng1)
-        x2, w2 = gausslegendre(Arb, ng2)
-        xx = -cos(atan(scatterer.d_to_h))
-        x[1:ng1] .= 0.5(xx + 1.0) .* x1 .+ 0.5(xx - 1.0)
-        w[1:ng1] .= 0.5(xx + 1.0) .* w1
-        x[(ng1 + 1):ng] .= -0.5xx .* x2 .+ 0.5xx
-        w[(ng1 + 1):ng] .= -0.5xx .* w2
-        x[(ng + 1):ngauss] .= (-1.0) .* x[ng:-1:1]
-        w[(ng + 1):ngauss] .= w[ng:-1:1]
-    elseif typeof(scatterer) <: Bicone
-        ng = ngauss ÷ 2
-        x1, w1 = gausslegendre(Arb, ng)
-        @. x[1:ng] = 0.5(x1 - 1)
-        @. w[1:ng] = 0.5w1
-        @. x[(ng + 1):ngauss] = (-1) * x[ng:-1:1]
-        @. w[(ng + 1):ngauss] = w[ng:-1:1]
-    else
-        gausslegendre!(Arb, ngauss, x, w)
+    return gausslegendre!(Arb, ngauss, x, w)
+end
+
+function calc_r!(
+    scatterer::Cylinder{Arb},
+    ngauss::Int64,
+    x::Arblib.ArbVectorLike,
+    w::Arblib.ArbVectorLike,
+    r::Arblib.ArbVectorLike,
+    dr::Arblib.ArbVectorLike,
+)
+    theta_split!(scatterer, ngauss, x, w)
+    rev = scatterer.rev
+    e = scatterer.d_to_h
+    h = rev * ∛(2 / (3e^2))
+    d = h * e
+
+    for i in 1:(ngauss ÷ 2)
+        cosθ = abs(x[i])
+        cos²θ = cosθ^2
+        sin²θ = 1 - cos²θ
+        sinθ = √sin²θ
+        r₁ = h / cosθ
+        r₂ = d / sinθ
+        if r₁ < r₂
+            r[i] = r₁
+            dr[i] = h * sinθ / cos²θ
+        else
+            r[i] = r₂
+            dr[i] = -d * cosθ / sin²θ
+        end
+        r[ngauss + 1 - i] = r[i]
+        dr[ngauss + 1 - i] = dr[i]
+        dr[i] = -dr[i]
     end
 end
 
 function calc_r!(
-    scatterer::AbstractScatterer{Arb},
+    scatterer::Spheroid{Arb},
     ngauss::Int64,
     x::Arblib.ArbVectorLike,
     w::Arblib.ArbVectorLike,
@@ -93,117 +129,99 @@ function calc_r!(
     theta_split!(scatterer, ngauss, x, w)
     rev = scatterer.rev
 
-    if typeof(scatterer) <: Cylinder
-        if ngauss % 2 != 0
-            error("Constraint violated: ngauss should be even for cylinders")
-        end
+    e = scatterer.a_to_c
+    e² = e^2
+    a = rev * ∛e
+    a² = a^2
+    ratio = e² - 1
 
-        e = scatterer.d_to_h
-        h = rev * ∛(2 / (3e^2))
-        d = h * e
+    for i in 1:(ngauss ÷ 2)
+        cosθ = x[i]
+        cos²θ = cosθ^2
+        sin²θ = 1 - cos²θ
+        sinθ = √sin²θ
 
-        for i in 1:(ngauss ÷ 2)
-            cosθ = abs(x[i])
-            cos²θ = cosθ^2
-            sin²θ = 1 - cos²θ
-            sinθ = √sin²θ
-            r₁ = h / cosθ
-            r₂ = d / sinθ
-            if r₁ < r₂
-                r[i] = r₁
-                dr[i] = h * sinθ / cos²θ
-            else
-                r[i] = r₂
-                dr[i] = -d * cosθ / sin²θ
-            end
-            r[ngauss + 1 - i] = r[i]
-            dr[ngauss + 1 - i] = dr[i]
-            dr[i] = -dr[i]
-        end
+        r[i] = e²
+        Arblib.mul!(r[i], r[i], cos²θ)
+        Arblib.add!(r[i], r[i], sin²θ)
+        Arblib.div!(r[i], ARB_ONE, r[i])
+        Arblib.sqrt!(r[i], r[i])
+        Arblib.mul!(r[i], r[i], a)
+        r[ngauss + 1 - i] = r[i]
 
-    elseif typeof(scatterer) <: Spheroid
-        if ngauss % 2 != 0
-            error("Constraint violated: ngauss should be even for spheroids")
-        end
+        Arblib.pow!(dr[i], r[i], UInt64(3))
+        Arblib.mul!(dr[i], dr[i], cosθ)
+        Arblib.mul!(dr[i], dr[i], sinθ)
+        Arblib.mul!(dr[i], dr[i], ratio)
+        Arblib.div!(dr[i], dr[i], a²)
+        Arblib.mul!(dr[ngauss + 1 - i], dr[i], ARB_ONE_NEG)
+    end
+end
 
-        e = scatterer.a_to_c
-        e² = e^2
-        a = rev * ∛e
-        a² = a^2
-        ratio = e² - 1
+function calc_r!(
+    scatterer::Bicone{Arb},
+    ngauss::Int64,
+    x::Arblib.ArbVectorLike,
+    w::Arblib.ArbVectorLike,
+    r::Arblib.ArbVectorLike,
+    dr::Arblib.ArbVectorLike,
+)
+    theta_split!(scatterer, ngauss, x, w)
+    rev = scatterer.rev
+    e = scatterer.d_to_h
+    h = rev * ∛(2 / e^2)
+    r₀ = h * e
+    α = atan(1 / e)
+    sinα = sin(α)
 
-        for i in 1:(ngauss ÷ 2)
-            cosθ = x[i]
-            cos²θ = cosθ^2
-            sin²θ = 1 - cos²θ
-            sinθ = √sin²θ
+    @simd for i in 1:(ngauss ÷ 2)
+        cosθ = abs(x[i])
+        θ = acos(cosθ)
+        β = π - α - θ
+        sinβ = sin(β)
+        cosβ = cos(β)
+        r[i] = r₀ / sinβ * sinα
+        r[ngauss + 1 - i] = r[i]
+        dr[i] = -r[i] * cosβ / sinβ
+        dr[ngauss + 1 - i] = -dr[i]
+    end
+end
 
-            r[i] = e²
-            Arblib.mul!(r[i], r[i], cos²θ)
-            Arblib.add!(r[i], r[i], sin²θ)
-            Arblib.div!(r[i], ARB_ONE, r[i])
-            Arblib.sqrt!(r[i], r[i])
-            Arblib.mul!(r[i], r[i], a)
-            r[ngauss + 1 - i] = r[i]
+function calc_r!(
+    scatterer::Chebyshev{Arb},
+    ngauss::Int64,
+    x::Arblib.ArbVectorLike,
+    w::Arblib.ArbVectorLike,
+    r::Arblib.ArbVectorLike,
+    dr::Arblib.ArbVectorLike,
+)
+    theta_split!(scatterer, ngauss, x, w)
+    rev = scatterer.rev
+    e = scatterer.ε
+    n = scatterer.n
+    a = 1.5e^2 * (4n^2 - 2) / (4n^2 - 1) + 1
 
-            Arblib.pow!(dr[i], r[i], UInt64(3))
-            Arblib.mul!(dr[i], dr[i], cosθ)
-            Arblib.mul!(dr[i], dr[i], sinθ)
-            Arblib.mul!(dr[i], dr[i], ratio)
-            Arblib.div!(dr[i], dr[i], a²)
-            Arblib.mul!(dr[ngauss + 1 - i], dr[i], ARB_ONE_NEG)
-        end
-    elseif typeof(scatterer) <: Bicone
-        if ngauss % 2 != 0
-            throw(DomainError(ngauss, "Constraint violated: ngauss should be even for bicones"))
-        end
+    if n % 2 == 0
+        a -= 3e * (1 + 0.25e^2) / (n^2 - 1) + 0.25e^3 / (9n^2 - 1)
+    end
 
-        e = scatterer.d_to_h
-        h = rev * ∛(2 / e^2)
-        r₀ = h * e
-        α = atan(1 / e)
-        sinα = sin(α)
+    r0 = rev / ∛a
+    r0₋ = -r0
 
-        @simd for i in 1:(ngauss ÷ 2)
-            cosθ = abs(x[i])
-            θ = acos(cosθ)
-            β = π - α - θ
-            sinβ = sin(β)
-            cosβ = cos(β)
-            r[i] = r₀ / sinβ * sinα
-            r[ngauss + 1 - i] = r[i]
-            dr[i] = -r[i] * cosβ / sinβ
-            dr[ngauss + 1 - i] = -dr[i]
-        end
-    else
-        @assert typeof(scatterer) <: Chebyshev
-        e = scatterer.ε
-        n = scatterer.n
+    for i in 1:ngauss
+        xi = Arb(x[i])
+        Arblib.acos!(xi, xi)
+        Arblib.mul!(xi, xi, n)
 
-        a = 1.5e^2 * (4n^2 - 2) / (4n^2 - 1) + 1
+        r[i] = e
+        Arblib.mul!(r[i], r[i], cos(xi))
+        Arblib.add!(r[i], r[i], ARB_ONE)
+        Arblib.mul!(r[i], r[i], r0)
 
-        if n % 2 == 0
-            a -= 3e * (1 + 0.25e^2) / (n^2 - 1) + 0.25e^3 / (9n^2 - 1)
-        end
-
-        r0 = rev / ∛a
-        r0₋ = -r0
-
-        for i in 1:ngauss
-            xi = Arb(x[i])
-            Arblib.acos!(xi, xi)
-            Arblib.mul!(xi, xi, n)
-
-            r[i] = e
-            Arblib.mul!(r[i], r[i], cos(xi))
-            Arblib.add!(r[i], r[i], ARB_ONE)
-            Arblib.mul!(r[i], r[i], r0)
-
-            dr[i] = r0₋
-            Arblib.mul!(dr[i], dr[i], e)
-            Arblib.mul!(dr[i], dr[i], n)
-            Arblib.mul!(dr[i], dr[i], sin(xi))
-        end
+        dr[i] = r0₋
+        Arblib.mul!(dr[i], dr[i], e)
+        Arblib.mul!(dr[i], dr[i], n)
+        Arblib.mul!(dr[i], dr[i], sin(xi))
     end
 end
 
@@ -322,6 +340,8 @@ function update!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
 end
 
 function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
+    @assert ngauss % 2 == 0
+
     sym = has_symmetric_plane(scatterer)
     update!(scatterer, ngauss, nmax)
 
@@ -461,6 +481,8 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
 end
 
 function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax::Int64;)
+    @assert ngauss % 2 == 0
+
     sym = has_symmetric_plane(scatterer)
     update!(scatterer, ngauss, nmax)
 
