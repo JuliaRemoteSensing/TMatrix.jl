@@ -1,3 +1,5 @@
+has_symmetric_plane(scatterer::AbstractScatterer) = false
+
 function theta_split!(
     scatterer::AbstractScatterer{T},
     ngauss::Int64,

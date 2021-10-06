@@ -17,6 +17,15 @@ struct Spheroid{T<:Real,CT<:Number,RV,RM,CV,CM} <: AbstractScatterer{T,CT}
     info::ScattererInfo{RV,RM,CV,CM}
 end
 
+function Spheroid(T::Type{<:Real} = Float64; a::Real = 1.0, c::Real = 1.0, m::Number = 1.0 + 0.0im, λ::Real = 1.0)
+    a = T(a)
+    c = T(c)
+    m = Complex{T}(m)
+    λ = T(λ)
+    rev = ∛(a^2 * c)
+    return Spheroid(rev, m, a / c, λ, ScattererInfo(T))
+end
+
 has_symmetric_plane(spheroid::Spheroid) = true
 
 function calc_r!(
