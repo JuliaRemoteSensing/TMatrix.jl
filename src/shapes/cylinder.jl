@@ -46,8 +46,8 @@ function calc_r!(
     theta_split!(scatterer, ngauss, x, w)
     rev = scatterer.rev
     e = scatterer.d_to_h
-    h = rev * ∛(2 / (3e^2))
-    d = h * e
+    h = rev * ∛(2 / (3e^2)) # This is actually H / 2
+    d = h * e # This is actually D / 2
 
     @simd for i in 1:(ngauss ÷ 2)
         cosθ = abs(x[i])

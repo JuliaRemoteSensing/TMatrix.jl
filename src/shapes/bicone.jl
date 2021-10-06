@@ -40,8 +40,7 @@ function calc_r!(
     rev = scatterer.rev
     e = scatterer.r_to_h
     h = rev * ∛(2 / e^2)
-    r₀ = h * e
-    α = atan(1 / e)
+    α = atan(e)
     sinα = sin(α)
 
     @simd for i in 1:(ngauss ÷ 2)
@@ -50,7 +49,7 @@ function calc_r!(
         β = π - α - θ
         sinβ = sin(β)
         cosβ = cos(β)
-        r[i] = r₀ / sinβ * sinα
+        r[i] = h / sinβ * sinα
         r[ngauss + 1 - i] = r[i]
         dr[i] = -r[i] * cosβ / sinβ
         dr[ngauss + 1 - i] = -dr[i]
@@ -78,8 +77,7 @@ function calc_r!(
     rev = scatterer.rev
     e = scatterer.r_to_h
     h = rev * ∛(2 / e^2)
-    r₀ = h * e
-    α = atan(1 / e)
+    α = atan(e)
     sinα = sin(α)
 
     @simd for i in 1:(ngauss ÷ 2)
@@ -88,7 +86,7 @@ function calc_r!(
         β = π - α - θ
         sinβ = sin(β)
         cosβ = cos(β)
-        r[i] = r₀ / sinβ * sinα
+        r[i] = h / sinβ * sinα
         r[ngauss + 1 - i] = r[i]
         dr[i] = -r[i] * cosβ / sinβ
         dr[ngauss + 1 - i] = -dr[i]
