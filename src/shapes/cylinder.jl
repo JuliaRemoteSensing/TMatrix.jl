@@ -3,30 +3,83 @@ A cylinder scatterer.
 
 Attributes:
 
-- `rev`: The equivalent volume radius.
 - `m`: The complex refractive index.
-- `d_to_h`: The diameter-to-height ratio $D/H$.
+- `r`: The radius of the cylinder base.
+- `h`: The height of the cylinder.
 - `λ`: The wavelength of the incident wave.
 - `info`: The accompanied information.
 """
 struct Cylinder{T<:Real,CT<:Number,RV,RM,CV,CM} <: AbstractScatterer{T,CT}
-    rev::T
     m::CT
-    d_to_h::T
+    r::T
+    h::T
     λ::T
     info::ScattererInfo{RV,RM,CV,CM}
 end
 
-function Cylinder(T::Type{<:Real} = Float64; r::Real = 1.0, h::Real = 1.0, m::Number = 1.0 + 0.0im, λ::Real = 1.0)
+@doc raw"""
+Construct a cylinder. `λ` and `m` must be provided, and the size parameters are considered according to the following priority:
+
+1. `r` and `h`
+2. `r` and `r_to_h`
+3. `h` and `r_to_h`
+4. `rev` and `r_to_h`
+5. `rea` and `r_to_h`
+6. `rmax` and `r_to_h`
+
+If none of the above is hit, an `ArgumentError` will be thrown.
+
+"""
+function Cylinder(
+    T::Type{<:Real} = Float64;
+    r::Real = 0,
+    h::Real = 0,
+    r_to_h::Real = 0,
+    rev::Real = 0,
+    rea::Real = 0,
+    rmax::Real = 0,
+    m::Number,
+    λ::Real,
+)
+    m = Complex{T}(m)
     r = T(r)
     h = T(h)
-    m = Complex{T}(m)
+    rev = T(rev)
+    rea = T(rea)
+    r_to_h = T(r_to_h)
     λ = T(λ)
-    rev = ∛(3r^2 * h / 4)
-    return Cylinder(rev, m, 2r / h, λ, ScattererInfo(T)) # Axis ratio is defined as D/H for cylinders.
+    info = ScattererInfo(T)
+
+    if !iszero(r) && !iszero(h)
+        nothing
+    elseif !iszero(r) && !iszero(r_to_h)
+        h = r / r_to_h
+    elseif !iszero(h) && !iszero(r_to_h)
+        r = h * r_to_h
+    elseif !iszero(rev) && !iszero(r_to_h)
+        h = rev * ∛(4 / (3r_to_h^2))
+        r = h * r_to_h
+    elseif !iszero(rea) && !iszero(r_to_h)
+        e = 2r_to_h
+        ratio = ∛(R_3_2 / e) / √((e + 2) / 2e)
+        rev = ratio * rea
+        h = rev * ∛(4 / (3r_to_h^2))
+        r = h * r_to_h
+    elseif !iszero(rmax) && !iszero(r_to_h)
+        e = 2r_to_h
+        rev = axis_ratio > 1.0 ? r * ∛(R_3_2 / e) : r * ∛(R_3_2 * e^2)
+        h = rev * ∛(4 / (3r_to_h^2))
+        r = h * r_to_h
+    else
+        throw(ArgumentError("Cannot construct a valid cylinder with the given parameters."))
+    end
+
+    return Cylinder(m, r, h, λ, ScattererInfo(T)) # Axis ratio is defined as D/H for cylinders.
 end
 
 has_symmetric_plane(cylinder::Cylinder) = true
+
+volume_equivalent_radius(cylinder::Cylinder) = ∛(3cylinder.r^2 * cylinder.h / 4)
 
 @doc raw"""
 ```
@@ -44,10 +97,8 @@ function calc_r!(
     dr::AbstractArray,
 ) where {T<:Real}
     theta_split!(scatterer, ngauss, x, w)
-    rev = scatterer.rev
-    e = scatterer.d_to_h
-    h = rev * ∛(2 / (3e^2)) # This is actually H / 2
-    d = h * e # This is actually D / 2
+    h = scatterer.h / 2
+    d = scatterer.r
 
     @simd for i in 1:(ngauss ÷ 2)
         cosθ = abs(x[i])
@@ -71,7 +122,7 @@ function theta_split!(scatterer::Cylinder{T}, ngauss::Int64, x::AbstractArray, w
     ng2 = ng - ng1
     x1, w1 = gausslegendre(T, ng1)
     x2, w2 = gausslegendre(T, ng2)
-    xx = -cos(atan(scatterer.d_to_h))
+    xx = -cos(atan(2scatterer.r / scatterer.h))
     x[1:ng1] .= 0.5(xx + 1.0) .* x1 .+ 0.5(xx - 1.0)
     w[1:ng1] .= 0.5(xx + 1.0) .* w1
     x[(ng1 + 1):ng] .= -0.5xx .* x2 .+ 0.5xx
@@ -90,10 +141,8 @@ function calc_r!(
     dr::Arblib.ArbVectorLike,
 )
     theta_split!(scatterer, ngauss, x, w)
-    rev = scatterer.rev
-    e = scatterer.d_to_h
-    h = rev * ∛(2 / (3e^2))
-    d = h * e
+    h = scatterer.h / 2
+    d = scatterer.r
 
     for i in 1:(ngauss ÷ 2)
         cosθ = abs(x[i])
@@ -121,7 +170,7 @@ function theta_split!(scatterer::Cylinder{Arb}, ngauss::Int64, x::Arblib.ArbVect
     ng2 = ng - ng1
     x1, w1 = gausslegendre(Arb, ng1)
     x2, w2 = gausslegendre(Arb, ng2)
-    xx = -cos(atan(scatterer.d_to_h))
+    xx = -cos(atan(2scatterer.r / scatterer.h))
     x[1:ng1] .= 0.5(xx + 1.0) .* x1 .+ 0.5(xx - 1.0)
     w[1:ng1] .= 0.5(xx + 1.0) .* w1
     x[(ng1 + 1):ng] .= -0.5xx .* x2 .+ 0.5xx

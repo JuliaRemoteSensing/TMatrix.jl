@@ -1,5 +1,11 @@
-@enum Shape SHAPE_SPHEROID SHAPE_CYLINDER SHAPE_BICONE SHAPE_CHEBYSHEV
-@enum RadiusType RADIUS_EQUAL_VOLUME RADIUS_EQUAL_AREA RADIUS_MAXIMUM
+const R_1_2 = 1 // 2
+const R_3_2 = 3 // 2
+const R_1_4 = 1 // 4
+const R_3_4 = 3 // 4
+const R_1_3 = 1 // 3
+const R_2_3 = 2 // 3
+const R_4_3 = 4 // 3
+const R_1_6 = 1 // 6
 
 const DEFAULT_NCAP = Ref{Int64}(100)
 const DEFAULT_NGCAP = Ref{Int64}(500)
@@ -187,130 +193,6 @@ abstract type AbstractScatterer{T<:Real,CT<:Number} end
 include("shapes/shapes.jl")
 
 @doc raw"""
-Scatterer constructor with named parameters.
-
-Parameters:
-
-- `T`: The data type to be used in future calculations.
-- `r`: The equivalent radius.
-- `shape`: The particle shape. Possible values are `SHAPE_SPHEROID` (default), `SHAPE_CYLINDER` and `SHAPE_CHEBYSHEV`.
-- `axis_ratio`: For spheroids, it is the ratio $a/b$ of the horizontal to rotational axes. For cylinders, it is the diameter-to-length ratio $D/L$. For Chebyshev particles, it is the deformation parameter $\varepsilon$.
-- `radius_type`: The type of the equivalent radius. Possible values are `RADIUS_EQUAL_VOLUME` (default), `RADIUS_EQUAL_AREA` and `RADIUS_MAXIMUM`. All radius types will be transformed into the equivalent volume radius.
-- `refractive_index`: The complex refractive index.
-- `ngauss`: Number of points for Gaussian integration. Required only for Chebyshev particles.
-- `n`: Degree of the Chebyshev polynomial. Required only for Chebyshev particles.
-- `λ`: The wavelength to be used in future calculations.
-
-"""
-function Scatterer(
-    T::Type{<:Real} = Float64;
-    r::Real = 1.0,
-    shape::Shape = SHAPE_SPHEROID,
-    axis_ratio::Real = 1.0,
-    radius_type::RadiusType = RADIUS_EQUAL_VOLUME,
-    refractive_index::Number = 1.0 + 0.0im,
-    n::Int64 = 2,
-    ngauss::Int64 = DEFAULT_NGCHEB[],
-    λ::Real = 1.0,
-)
-    if shape == SHAPE_CHEBYSHEV && (abs(axis_ratio) < 0.0 || abs(axis_ratio) >= 1.0)
-        error("Constraint violated: Chebyshev particles should have 0≤|ε|<1.")
-    end
-
-    r = T(r)
-    axis_ratio = T(axis_ratio)
-    refractive_index = Complex{T}(refractive_index)
-    λ = T(λ)
-    f12 = T(1 // 2)
-    f32 = T(3 // 2)
-    f14 = T(1 // 4)
-    f34 = T(3 // 4)
-    f13 = T(1 // 3)
-    f23 = T(2 // 3)
-    f43 = T(4 // 3)
-    f16 = T(1 // 6)
-
-    if radius_type == RADIUS_EQUAL_VOLUME
-        rev = r
-    elseif radius_type == RADIUS_EQUAL_AREA
-        if shape == SHAPE_SPHEROID
-            d = axis_ratio
-            if abs(d - 1.0) < eps(d)
-                ratio = 1.0
-            elseif d > 1.0
-                e = √(1 - 1 / d^2)
-                ratio = 1 / √(f14 * (2d^f23 + d^(-f43) * log((1 + e) / (1 - e)) / e))
-            elseif d < 1.0
-                e = √(1 - d^2)
-                ratio = 1 / √(f12 * (d^f23 + d^(-f13) * asin(e) / e))
-            end
-        elseif shape == SHAPE_CYLINDER
-            e = axis_ratio
-            ratio = ∛(f32 / e) / √((e + 2) / 2e)
-        elseif shape == SHAPE_BICONE
-            e = axis_ratio
-            ratio = (2e)^f16 / √(e + √(1 + e^2))
-        elseif shape == SHAPE_CHEBYSHEV
-            e = axis_ratio
-            en = e * n
-            x, w = gausslegendre(T, ngauss)
-            s = zero(T)
-            v = zero(T)
-            @simd for i in 1:ngauss
-                θ = acos(x[i])
-                nθ = n * θ
-                sinθ = sin(θ)
-                sinnθ = sin(nθ)
-                cosnθ = cos(nθ)
-                a = 1 + e * cosnθ
-                ens = en * sinnθ
-                s += w[i] * a * √(a^2 + ens^2)
-                v += w[i] * (sinθ * a + x[i] * ens) * sinθ * a^2
-            end
-            rs = √(f12 * s)
-            rv = ∛(f34 * v)
-            ratio = rv / rs
-        end
-
-        rev = r * ratio
-    elseif radius_type == RADIUS_MAXIMUM
-        if shape == SHAPE_SPHEROID
-            rev = axis_ratio > 1.0 ? r / ∛axis_ratio : r * axis_ratio^f23
-        elseif shape == SHAPE_CYLINDER
-            rev = axis_ratio > 1.0 ? r * ∛(f32 / axis_ratio) : r * ∛(f32 * axis_ratio^2)
-        elseif shape == SHAPE_BICONE
-            rev = axis_ratio > 1.0 ? r * ∛(f12 / axis_ratio) : r * ∛(axis_ratio^2 * f12)
-        elseif shape == SHAPE_CHEBYSHEV
-            e = axis_ratio
-            en = e * n
-            x, w = gausslegendre(T, ngauss)
-            θ = acos.(x)
-            nθ = n * θ
-            sinθ = sin.(θ)
-            sinnθ = sin.(nθ)
-            cosnθ = cos.(nθ)
-            a = e * cosnθ .+ 1
-            ens = en * sinnθ
-            v = sum(w .* (sinθ .* a + x .* ens) .* sinθ * a .^ 2)
-            rv = ∛(f34 * v)
-            rev = r / (1 + e) * rv
-        end
-    end
-
-    rev = T(rev)
-
-    if shape == SHAPE_SPHEROID
-        return Spheroid(rev, refractive_index, axis_ratio, λ, ScattererInfo(T))
-    elseif shape == SHAPE_CYLINDER
-        return Cylinder(rev, refractive_index, axis_ratio, λ, ScattererInfo(T))
-    elseif shape == SHAPE_BICONE
-        return Bicone(rev, refractive_index, axis_ratio, λ, ScattererInfo(T))
-    elseif shape == SHAPE_CHEBYSHEV
-        return Chebyshev(rev, refractive_index, axis_ratio, n, λ, ScattererInfo(T))
-    end
-end
-
-@doc raw"""
 ```
 tmatrix_routine_mishchenko(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64) where {T<:Real}
 ```
@@ -333,7 +215,7 @@ function tmatrix_routine_mishchenko(
     nstart::Int64 = 0,
     ngstart::Int64 = nstart * ndgs,
 ) where {T<:Real}
-    kr = 2 * T(π) * scatterer.rev / scatterer.λ
+    kr = 2 * T(π) * volume_equivalent_radius(scatterer) / scatterer.λ
     if nstart == 0
         nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
         ngstart = nstart * ndgs
@@ -395,7 +277,7 @@ function tmatrix_routine_mishchenko_nmaxonly(
     nstart::Int64 = 0,
     ngstart::Int64 = nstart * ndgs,
 ) where {T<:Real}
-    kr = 2 * T(π) * scatterer.rev / scatterer.λ
+    kr = 2 * T(π) * volume_equivalent_radius(scatterer) / scatterer.λ
     if nstart == 0
         nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
         ngstart = nstart * ndgs
@@ -1226,7 +1108,7 @@ function vary(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where
 end
 
 function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) where {T<:Real}
-    @assert ngauss % 2 == 0
+    @assert iseven(ngauss)
 
     CT = Complex{T}
 
@@ -1335,7 +1217,7 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
 end
 
 function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::Int64;) where {T<:Real}
-    @assert ngauss % 2 == 0
+    @assert iseven(ngauss)
 
     sym = has_symmetric_plane(scatterer)
     update!(scatterer, ngauss, nmax)

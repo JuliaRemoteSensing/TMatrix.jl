@@ -3,32 +3,34 @@ A capsule scatterer, which is a cylinder with half-spherical caps on both ends.
 
 Attributes:
 
-- `rev`: The equivalent volume radius.
 - `m`: The complex refractive index.
-- `d`: The diameter of the cylinder base and the hemisphere.
+- `r`: The radius of the cylinder base and the hemisphere.
 - `h`: The height of the cylinder.
 - `λ`: The wavelength of the incident wave.
 - `info`: The accompanied information.
 """
 struct Capsule{T<:Real,CT<:Number,RV,RM,CV,CM} <: AbstractScatterer{T,CT}
-    rev::T
     m::CT
-    d::T
+    r::T
     h::T
     λ::T
     info::ScattererInfo{RV,RM,CV,CM}
 end
 
-function Capsule(T::Type{<:Real} = Float64; d::Real = 1.0, h::Real = 1.0, m::Number = 1.0 + 0.0im, λ::Real = 1.0)
-    d = T(d)
-    h = T(h)
+@doc raw"""
+Construct a capsule.
+"""
+function Capsule(T::Type{<:Real} = Float64; r::Real = 1.0, h::Real = 1.0, m::Number = 1.0 + 0.0im, λ::Real = 1.0)
     m = Complex{T}(m)
+    r = T(r)
+    h = T(h)
     λ = T(λ)
-    rev = ∛(d^3 / 8 + 3d^2 * h / 16)
-    return Capsule(rev, m, d, h, λ, ScattererInfo(T))
+    return Capsule(m, r, h, λ, ScattererInfo(T))
 end
 
 has_symmetric_plane(capsule::Capsule) = true
+
+volume_equivalent_radius(capsule::Capsule) = ∛(capsule.r^3 / 2 + 3capsule.r^2 * capsule.h / 4)
 
 @doc raw"""
 ```
@@ -46,7 +48,7 @@ function calc_r!(
     dr::AbstractArray,
 ) where {T<:Real}
     theta_split!(scatterer, ngauss, x, w)
-    d = scatterer.d / 2
+    d = scatterer.r
     h = scatterer.h / 2
 
     @simd for i in 1:(ngauss ÷ 2)
@@ -74,7 +76,7 @@ function theta_split!(scatterer::Capsule{T}, ngauss::Int64, x::AbstractArray, w:
     ng2 = ng - ng1
     x1, w1 = gausslegendre(T, ng1)
     x2, w2 = gausslegendre(T, ng2)
-    xx = -cos(atan(scatterer.d / scatterer.h))
+    xx = -cos(atan(2scatterer.r / scatterer.h))
     @. x[1:ng1] = 0.5(xx + 1.0) * x1 + 0.5(xx - 1.0)
     @. w[1:ng1] = 0.5(xx + 1.0) * w1
     @. x[(ng1 + 1):ng] = -0.5xx * x2 + 0.5xx

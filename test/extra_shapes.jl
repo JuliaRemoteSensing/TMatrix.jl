@@ -14,9 +14,9 @@
     end
 
     @testset "Capsule" begin
-        @testset "d = $d, h = $h" for (d, h) in [(2, 2), (1, 3 // 2), (1, 2 // 3)]
+        @testset "r = $r, h = $h" for (r, h) in [(1, 2), (1 // 2, 3 // 2), (1 // 2, 2 // 3)]
             @test begin
-                scatterer = TMatrix.Capsule(d = d, h = h, m = m, λ = λ)
+                scatterer = TMatrix.Capsule(r = r, h = h, m = m, λ = λ)
                 TT = TMatrix.calc_tmatrix!(scatterer)
                 _, _, ω = TMatrix.cross_section(TT, scatterer.λ)
                 abs(ω - 1) < 1e-4

@@ -9,24 +9,17 @@
 
         @testset "for spheroids with a_to_c = $a_to_c" for a_to_c in [0.5, 1.01, 2.0]
             @test begin
-                scatterer = TMatrix.Scatterer(
-                    r = rev,
-                    shape = TMatrix.SHAPE_SPHEROID,
-                    radius_type = TMatrix.RADIUS_EQUAL_VOLUME,
-                    refractive_index = m,
-                    axis_ratio = a_to_c,
-                    λ = λ,
-                )
+                spheroid = TMatrix.Spheroid(m = m, a_to_c = a_to_c, rev = rev, λ = λ)
 
-                T = TMatrix.calc_tmatrix!(scatterer, ddelta, ndgs)
-                Csca, _ = TMatrix.cross_section(T, scatterer.λ)
+                T = TMatrix.calc_tmatrix!(spheroid, ddelta, ndgs)
+                Csca, _ = TMatrix.cross_section(T, spheroid.λ)
                 nmax = length(T) - 1
 
                 np = -1
                 TMatrix.Wrapper.Random.set_T!(T)
 
-                α₁, α₂, α₃, α₄, β₁, β₂ = TMatrix.calc_expansion_coefficients(T, Csca, scatterer.λ)
-                α₁′, α₂′, α₃′, α₄′, β₁′, β₂′, lmax = TMatrix.Wrapper.Random.gsp(nmax, Csca, scatterer.λ)
+                α₁, α₂, α₃, α₄, β₁, β₂ = TMatrix.calc_expansion_coefficients(T, Csca, spheroid.λ)
+                α₁′, α₂′, α₃′, α₄′, β₁′, β₂′, lmax = TMatrix.Wrapper.Random.gsp(nmax, Csca, spheroid.λ)
 
                 all(isapprox.(α₁[0:lmax], α₁′[0:lmax], rtol = RTOL, atol = ATOL)) &&
                     all(isapprox.(α₂[0:lmax], α₂′[0:lmax], rtol = RTOL, atol = ATOL)) &&
@@ -37,26 +30,18 @@
             end
         end
 
-        @testset "for cylinders with d_to_h = $d_to_h" for d_to_h in [0.5, 1.0, 2.0]
+        @testset "for cylinders with r_to_h = $r_to_h" for r_to_h in [0.25, 0.5, 1.0]
             @test begin
-                scatterer = TMatrix.Scatterer(
-                    r = rev,
-                    shape = TMatrix.SHAPE_CYLINDER,
-                    radius_type = TMatrix.RADIUS_EQUAL_VOLUME,
-                    refractive_index = m,
-                    axis_ratio = d_to_h,
-                    λ = λ,
-                )
-
-                T = TMatrix.calc_tmatrix!(scatterer, ddelta, ndgs)
-                Csca, _ = TMatrix.cross_section(T, scatterer.λ)
+                cylinder = TMatrix.Cylinder(m = m, r_to_h = r_to_h, rev = rev, λ = λ)
+                T = TMatrix.calc_tmatrix!(cylinder, ddelta, ndgs)
+                Csca, _ = TMatrix.cross_section(T, cylinder.λ)
                 nmax = length(T) - 1
 
                 np = -2
                 TMatrix.Wrapper.Random.set_T!(T)
 
-                α₁, α₂, α₃, α₄, β₁, β₂ = TMatrix.calc_expansion_coefficients(T, Csca, scatterer.λ)
-                α₁′, α₂′, α₃′, α₄′, β₁′, β₂′, lmax = TMatrix.Wrapper.Random.gsp(nmax, Csca, scatterer.λ)
+                α₁, α₂, α₃, α₄, β₁, β₂ = TMatrix.calc_expansion_coefficients(T, Csca, cylinder.λ)
+                α₁′, α₂′, α₃′, α₄′, β₁′, β₂′, lmax = TMatrix.Wrapper.Random.gsp(nmax, Csca, cylinder.λ)
 
                 all(isapprox.(α₁[0:lmax], α₁′[0:lmax], rtol = RTOL, atol = ATOL)) &&
                     all(isapprox.(α₂[0:lmax], α₂′[0:lmax], rtol = RTOL, atol = ATOL)) &&
@@ -71,25 +56,17 @@
             (ε, ncheb) for ε in [-0.15, 0.01, 0.1], ncheb in [2, 3, 4]
         ]
             @test begin
-                scatterer = TMatrix.Scatterer(
-                    r = rev,
-                    shape = TMatrix.SHAPE_CHEBYSHEV,
-                    radius_type = TMatrix.RADIUS_EQUAL_VOLUME,
-                    refractive_index = m,
-                    axis_ratio = ε,
-                    n = ncheb,
-                    λ = λ,
-                )
+                chebyshev = TMatrix.Chebyshev(m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
 
-                T = TMatrix.calc_tmatrix!(scatterer, ddelta, ndgs)
-                Csca, _ = TMatrix.cross_section(T, scatterer.λ)
+                T = TMatrix.calc_tmatrix!(chebyshev, ddelta, ndgs)
+                Csca, _ = TMatrix.cross_section(T, chebyshev.λ)
                 nmax = length(T) - 1
 
                 np = ncheb
                 TMatrix.Wrapper.Random.set_T!(T)
 
-                α₁, α₂, α₃, α₄, β₁, β₂ = TMatrix.calc_expansion_coefficients(T, Csca, scatterer.λ)
-                α₁′, α₂′, α₃′, α₄′, β₁′, β₂′, lmax = TMatrix.Wrapper.Random.gsp(nmax, Csca, scatterer.λ)
+                α₁, α₂, α₃, α₄, β₁, β₂ = TMatrix.calc_expansion_coefficients(T, Csca, chebyshev.λ)
+                α₁′, α₂′, α₃′, α₄′, β₁′, β₂′, lmax = TMatrix.Wrapper.Random.gsp(nmax, Csca, chebyshev.λ)
 
                 all(isapprox.(α₁[0:lmax], α₁′[0:lmax], rtol = RTOL, atol = ATOL)) &&
                     all(isapprox.(α₂[0:lmax], α₂′[0:lmax], rtol = RTOL, atol = ATOL)) &&

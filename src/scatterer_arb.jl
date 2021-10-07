@@ -166,7 +166,7 @@ function update!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
 end
 
 function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
-    @assert ngauss % 2 == 0
+    @assert iseven(ngauss)
 
     sym = has_symmetric_plane(scatterer)
     update!(scatterer, ngauss, nmax)
@@ -307,7 +307,7 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
 end
 
 function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax::Int64;)
-    @assert ngauss % 2 == 0
+    @assert iseven(ngauss)
 
     sym = has_symmetric_plane(scatterer)
     update!(scatterer, ngauss, nmax)
