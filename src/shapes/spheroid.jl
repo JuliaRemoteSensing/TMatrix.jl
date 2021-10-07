@@ -51,6 +51,13 @@ function calc_r!(
     end
 end
 
+function theta_split!(scatterer::Spheroid{T}, ngauss::Int64, x::AbstractArray, w::AbstractArray) where {T<:Real}
+    x0, w0 = gausslegendre(T, ngauss)
+    x .= x0
+    w .= w0
+    return
+end
+
 function calc_r!(
     scatterer::Spheroid{Arb},
     ngauss::Int64,
@@ -89,4 +96,9 @@ function calc_r!(
         Arblib.div!(dr[i], dr[i], a²)
         Arblib.mul!(dr[ngauss + 1 - i], dr[i], ARB_ONE_NEG)
     end
+end
+
+function theta_split!(scatterer::Spheroid{Arb}, ngauss::Int64, x::Arblib.ArbVectorLike, w::Arblib.ArbVectorLike)
+    gausslegendre!(Arb, ngauss, x, w)
+    return
 end

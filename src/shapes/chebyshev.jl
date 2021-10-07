@@ -55,6 +55,13 @@ function calc_r!(
     end
 end
 
+function theta_split!(scatterer::Chebyshev{T}, ngauss::Int64, x::AbstractArray, w::AbstractArray) where {T<:Real}
+    x0, w0 = gausslegendre(T, ngauss)
+    x .= x0
+    w .= w0
+    return
+end
+
 function calc_r!(
     scatterer::Chebyshev{Arb},
     ngauss::Int64,
@@ -91,4 +98,9 @@ function calc_r!(
         Arblib.mul!(dr[i], dr[i], n)
         Arblib.mul!(dr[i], dr[i], sin(xi))
     end
+end
+
+function theta_split!(scatterer::Chebyshev{Arb}, ngauss::Int64, x::Arblib.ArbVectorLike, w::Arblib.ArbVectorLike)
+    gausslegendre!(Arb, ngauss, x, w)
+    return
 end
