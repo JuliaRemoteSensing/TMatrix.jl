@@ -1202,13 +1202,7 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
     @. RgQ₁₁ = kkₛ * RgJ₂₁ + k² * RgJ₁₂
     @. RgQ₂₂ = kkₛ * RgJ₁₂ + k² * RgJ₂₁
 
-    try
-        LinearAlgebra.inv!(lu!(Q))
-    catch e
-        Q = inv(Q)
-    end
-
-    T0 = RgQ * Q
+    T0 = RgQ * inv(Q)
     T0 .*= -1
 
     return T0, Q, RgQ
@@ -1371,8 +1365,7 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
     @. RgQ₂₁ = kkₛ * RgJ₂₂ + k² * RgJ₁₁
     @. RgQ₂₂ = kkₛ * RgJ₁₂ + k² * RgJ₂₁
 
-    LinearAlgebra.inv!(lu!(Q))
-    Tm = RgQ * Q
+    Tm = RgQ * inv(Q)
     Tm .*= -1
 
     return Tm, Q, RgQ
