@@ -190,8 +190,6 @@ Abstract type for all scatterers.
 """
 abstract type AbstractScatterer{T<:Real,CT<:Number} end
 
-include("shapes/shapes.jl")
-
 @doc raw"""
 ```
 tmatrix_routine_mishchenko(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64) where {T<:Real}

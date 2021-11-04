@@ -1,5 +1,4 @@
 import Base: abs2, floor, complex, AbstractFloat, Complex
-
 import LinearAlgebra: inv
 
 const ARF_PREC_EXACT = 9223372036854775807
@@ -15,17 +14,9 @@ nonref(::Union{Acb,AcbRef}) = Acb
 nonref(x) = typeof(x)
 
 function rel_accuracy_bits(A::AbstractArray{<:Union{Arb,ArbRef,Acb,AcbRef}})
-    return minimum(
-        [Arblib.rel_accuracy_bits(a) for a in A if abs(Arblib.rel_accuracy_bits(a)) < ARF_PREC_EXACT];
-        init = precision(Arb),
-    )
+    return minimum(Arblib.rel_accuracy_bits.(A), init = precision(Arb))
 end
 
 function rel_accuracy_bits(A::Vector{<:Union{ArbRefVector,AcbRefVector}})
-    return minimum(
-        minimum(
-            [Arblib.rel_accuracy_bits(a) for a in B if abs(Arblib.rel_accuracy_bits(a)) < ARF_PREC_EXACT];
-            init = precision(Arb),
-        ) for B in A
-    )
+    return minimum(minimum(Arblib.rel_accuracy_bits.(B), init = precision(Arb)) for B in A)
 end

@@ -12,6 +12,7 @@ include("arb_compat.jl")
 include("helpers.jl")
 include("scatterer.jl")
 include("scatterer_arb.jl")
+include("shapes/shapes.jl")
 include("wrapper/wrapper.jl")
 
 end
