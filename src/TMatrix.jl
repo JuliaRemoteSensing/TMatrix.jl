@@ -4,7 +4,6 @@ using Arblib
 using Dates: format, now, UTC
 using FastGaussQuadrature
 using LinearAlgebra
-using LoopVectorization
 using OffsetArrays
 using WignerD
 using WignerSymbols

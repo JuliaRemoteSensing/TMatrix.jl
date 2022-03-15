@@ -250,20 +250,58 @@ gausslegendre(::Type{Float64}, n::Integer) = FastGaussQuadrature.gausslegendre(n
 
 function gausslegendre(T::Type{<:Real}, n::Integer)
     prec = precision(T)
-    x = ArbRefVector(n; prec = prec)
-    w = ArbRefVector(n; prec = prec)
+    level = -((prec - 1) ÷ 64 + 1) * 16
+    check = 10.0^level
 
-    for i in 1:(n ÷ 2)
-        Arblib.hypgeom_legendre_p_ui_root!(x[n + 1 - i], w[n + 1 - i], UInt64(n), UInt64(i - 1); prec = prec)
-        x[i] = -x[n + 1 - i]
-        w[i] = w[n + 1 - i]
+    z = zeros(T, n)
+    w = zeros(T, n)
+    k = n ÷ 2 + n % 2
+    for i in 1:k
+        m = n + 1 - i
+        if i == 1
+            x = 1 - 2 / ((n + 1) * n)
+        elseif i == 2
+            x = (z[n] - 1) * 4 + z[n]
+        elseif i == 3
+            x = (z[n - 1] - z[n]) * 8 // 5 + z[n - 1]
+        else
+            x = (z[m + 1] - z[m + 2]) * 3 + z[m + 3]
+        end
+        if i == k && isodd(n)
+            x = 0
+        end
+
+        check = T(check)
+        pa = zero(T)
+        pb = one(T)
+        it = 0
+        while abs(pb) > check * abs(x)
+            it += 1
+            if it > 100
+                check *= 10
+            end
+            pa = zero(T)
+            pb = one(T)
+            pc = x
+            for j in 2:n
+                pa = pb
+                pb = pc
+                pc = x * pb + (x * pb - pa) * (j - 1) / j
+            end
+            pa = 1 / ((pb - x * pc) * n)
+            pb = pa * pc * (1 - x * x)
+            x -= pb
+        end
+
+        z[m] = x
+        w[m] = 2 * pa * pa * (1 - x * x)
+        if i != k || iseven(n)
+            z[i] = -z[m]
+            w[i] = w[m]
+        end
     end
 
-    if n % 2 == 1
-        Arblib.hypgeom_legendre_p_ui_root!(x[n ÷ 2 + 1], w[n ÷ 2 + 1], UInt64(n), UInt64(n ÷ 2); prec = prec)
-    end
-
-    return [T(x[i]) for i in 1:n], [T(w[i]) for i in 1:n]
+    return z, w
 end
 
 function gausslegendre(T::Type{<:Union{Arb,ArbRef}}, n::Integer)

@@ -1,14 +1,13 @@
-import Base: abs2, floor, complex, AbstractFloat, Complex
-import LinearAlgebra: inv
+import Base: abs2, floor, convert, complex, AbstractFloat, Complex
 
 const ARF_PREC_EXACT = 9223372036854775807
 
 abs2(x::Union{Acb,AcbRef}) = real(x) * real(x) + imag(x) * imag(x)
 AbstractFloat(x::Union{Acb,AcbRef}) = AbstractFloat(Arblib.realref(x))
-Complex{Arb}(x::Acb) = x
-Complex{Arb}(x::Complex) = Acb(x.re, x.im)
-complex(x::Arb, y::Arb) = Acb(x, y)
-floor(x::Arb) = floor(Float64(x))
+Complex{Arb}(x::Arblib.AcbLike) = x
+Complex{Arb}(x::T) where {T<:Complex} = Acb(x.re, x.im)
+complex(x::Arblib.ArbLike, y::Arblib.ArbLike) = Acb(x, y)
+floor(x::Arblib.ArbLike) = floor(Float64(x))
 nonref(::Union{Arb,ArbRef}) = Arb
 nonref(::Union{Acb,AcbRef}) = Acb
 nonref(x) = typeof(x)

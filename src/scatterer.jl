@@ -1121,7 +1121,7 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
 
     d = view(info.d, 1:ngauss, 1:nmax)
     τ = view(info.τ, 1:ngauss, 1:nmax)
-    Threads.@threads for i in (ngauss ÷ 2 + 1):ngauss
+    for i in (ngauss ÷ 2 + 1):ngauss
         ineg = ngauss + 1 - i
         vig!(nmax, 0, x[i], view(d, i, :), view(τ, i, :))
         d[ineg, :] .= view(d, i, :) .* sig
@@ -1150,7 +1150,7 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
     fill!(RgJ₁₂, zero(CT))
     fill!(RgJ₂₁, zero(CT))
 
-    Threads.@threads for nn in 0:(nmax * nmax - 1)
+    for nn in 0:(nmax * nmax - 1)
         n₂ = nn ÷ nmax + 1
         n₁ = nn % nmax + 1
         if !(sym && (n₁ + n₂) % 2 == 1)
@@ -1226,7 +1226,7 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
     p = view(info.p, 1:ngauss, 1:nmax)
     τ = view(info.τ, 1:ngauss, 1:nmax)
 
-    Threads.@threads for i in (ngauss ÷ 2 + 1):ngauss
+    for i in (ngauss ÷ 2 + 1):ngauss
         ineg = ngauss + 1 - i
         vig!(nmax, m, x[i], view(d, i, :), view(τ, i, :))
         p[i, :] .= view(d, i, :) .* (s[i] * m)
@@ -1275,7 +1275,7 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
     OffsetRgJ₂₂ = OffsetArray(RgJ₂₂, mm:nmax, mm:nmax)
 
     nm = nmax - mm + 1
-    Threads.@threads for nn in 0:(nm * nm - 1)
+    for nn in 0:(nm * nm - 1)
         n₂ = nn ÷ nm + mm
         n₁ = nn % nm + mm
         if !(sym && (n₁ + n₂) % 2 == 0)
