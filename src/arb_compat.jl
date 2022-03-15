@@ -14,9 +14,9 @@ nonref(::Union{Acb,AcbRef}) = Acb
 nonref(x) = typeof(x)
 
 function rel_accuracy_bits(A::AbstractArray{<:Union{Arb,ArbRef,Acb,AcbRef}})
-    return minimum(Arblib.rel_accuracy_bits.(A), init = precision(Arb))
+    return minimum(Arblib.rel_accuracy_bits.(A); init = precision(Arb))
 end
 
 function rel_accuracy_bits(A::Vector{<:Union{ArbRefVector,AcbRefVector}})
-    return minimum(minimum(Arblib.rel_accuracy_bits.(B), init = precision(Arb)) for B in A)
+    return minimum(minimum(Arblib.rel_accuracy_bits.(B); init = precision(Arb)) for B in A)
 end

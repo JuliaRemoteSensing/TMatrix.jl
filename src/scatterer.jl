@@ -1153,12 +1153,12 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
     Threads.@threads for nn in 0:(nmax * nmax - 1)
         n₂ = nn ÷ nmax + 1
         n₁ = nn % nmax + 1
-        for i in 1:ngss
-            τ₁τ₂ = τ[i, n₁] * τ[i, n₂]
-            d₁τ₂ = d[i, n₁] * τ[i, n₂]
-            d₂τ₁ = d[i, n₂] * τ[i, n₁]
+        if !(sym && (n₁ + n₂) % 2 == 1)
+            for i in 1:ngss
+                τ₁τ₂ = τ[i, n₁] * τ[i, n₂]
+                d₁τ₂ = d[i, n₁] * τ[i, n₂]
+                d₂τ₁ = d[i, n₂] * τ[i, n₁]
 
-            if !(sym && (n₁ + n₂) % 2 == 1)
                 J₁₂[n₁, n₂] +=
                     wr²[i] * jkₛr[i, n₂] * (dhkr[i, n₁] * τ₁τ₂ + drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
@@ -1278,8 +1278,8 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
     Threads.@threads for nn in 0:(nm * nm - 1)
         n₂ = nn ÷ nm + mm
         n₁ = nn % nm + mm
-        for i in 1:ngss
-            if !(sym && (n₁ + n₂) % 2 == 0)
+        if !(sym && (n₁ + n₂) % 2 == 0)
+            for i in 1:ngss
                 pττp = p[i, n₁] * τ[i, n₂] + p[i, n₂] * τ[i, n₁]
                 p₁d₂ = p[i, n₁] * d[i, n₂]
 
@@ -1303,8 +1303,10 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
                         p₁d₂
                     )
             end
+        end
 
-            if !(sym && (n₁ + n₂) % 2 == 1)
+        if !(sym && (n₁ + n₂) % 2 == 1)
+            for i in 1:ngss
                 ppττ = p[i, n₁] * p[i, n₂] + τ[i, n₁] * τ[i, n₂]
                 d₁τ₂ = d[i, n₁] * τ[i, n₂]
                 d₂τ₁ = d[i, n₂] * τ[i, n₁]
@@ -1369,4 +1371,27 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
     Tm .*= -1
 
     return Tm, Q, RgQ
+end
+
+function check_convergece(
+    scatterer::AbstractScatterer{T},
+    nmax::Int64,
+    ngauss::Int64,
+    ndgs::Int64,
+    ddelta::Real,
+) where {T<:Real}
+    T0, _ = tmatr0!(scatterer, ngauss, nmax)
+    Qext = sum((2n + 1) * real(T0[n, n] + T0[n + nmax, n + nmax]) for n in 1:nmax)
+    Qsca = sum((2n + 1) * real(T0[n, n] * T0[n, n]' + T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]') for n in 1:nmax)
+
+    T0′, _ = tmatr0!(scatterer, ngauss + ndgs, nmax + 1)
+    Qext′ = sum((2n + 1) * real(T0′[n, n] + T0′[n + nmax, n + nmax]) for n in 1:nmax)
+    Qsca′ = sum(
+        (2n + 1) * real(T0′[n, n] * T0′[n, n]' + T0′[n + nmax, n + nmax] * T0′[n + nmax, n + nmax]') for n in 1:nmax
+    )
+
+    ΔQext = abs((Qext - Qext′) / abs(Qext′))
+    ΔQsca = abs((Qsca - Qsca′) / abs(Qsca′))
+
+    return max(ΔQext, ΔQsca) <= ddelta
 end

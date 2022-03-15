@@ -9,7 +9,7 @@
 
         @testset "for spheroids with a_to_c = $a_to_c" for a_to_c in [0.5, 1.01, 2.0]
             @test begin
-                spheroid = TMatrix.Spheroid(m = m, a_to_c = a_to_c, rev = rev, λ = λ)
+                spheroid = TMatrix.Spheroid(; m = m, a_to_c = a_to_c, rev = rev, λ = λ)
 
                 T = TMatrix.calc_tmatrix!(spheroid, ddelta, ndgs)
                 Csca, _ = TMatrix.cross_section(T, spheroid.λ)
@@ -32,7 +32,7 @@
 
         @testset "for cylinders with r_to_h = $r_to_h" for r_to_h in [0.25, 0.5, 1.0]
             @test begin
-                cylinder = TMatrix.Cylinder(m = m, r_to_h = r_to_h, rev = rev, λ = λ)
+                cylinder = TMatrix.Cylinder(; m = m, r_to_h = r_to_h, rev = rev, λ = λ)
                 T = TMatrix.calc_tmatrix!(cylinder, ddelta, ndgs)
                 Csca, _ = TMatrix.cross_section(T, cylinder.λ)
                 nmax = length(T) - 1
@@ -56,7 +56,7 @@
             (ε, ncheb) for ε in [-0.15, 0.01, 0.1], ncheb in [2, 3, 4]
         ]
             @test begin
-                chebyshev = TMatrix.Chebyshev(m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
+                chebyshev = TMatrix.Chebyshev(; m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
 
                 T = TMatrix.calc_tmatrix!(chebyshev, ddelta, ndgs)
                 Csca, _ = TMatrix.cross_section(T, chebyshev.λ)

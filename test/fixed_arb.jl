@@ -21,7 +21,7 @@ setprecision(Arb, 128)
 
         @testset "for spheroids with a_to_c = $a_to_c" for a_to_c in [1 // 2, 101 // 100, 2]
             @test begin
-                spheroid = TMatrix.Spheroid(m = m, a_to_c = a_to_c, rev = rev, λ = λ)
+                spheroid = TMatrix.Spheroid(; m = m, a_to_c = a_to_c, rev = rev, λ = λ)
 
                 T = TMatrix.calc_tmatrix!(spheroid, Float64(ddelta), ndgs)
                 S, Z = TMatrix.calc_SZ(
@@ -47,7 +47,7 @@ setprecision(Arb, 128)
 
         @testset "for cylinders with r_to_h = $r_to_h" for r_to_h in [1 // 4, 1 // 2, 1]
             @test begin
-                cylinder = TMatrix.Cylinder(m = m, r_to_h = r_to_h, rev = rev, λ = λ)
+                cylinder = TMatrix.Cylinder(; m = m, r_to_h = r_to_h, rev = rev, λ = λ)
 
                 T = TMatrix.calc_tmatrix!(cylinder, Float64(ddelta), ndgs)
                 S, Z = TMatrix.calc_SZ(
@@ -75,7 +75,7 @@ setprecision(Arb, 128)
             (ε, ncheb) for ε in [-3 // 20, 1 // 100, 1 // 10], ncheb in [2, 3, 4]
         ]
             @test begin
-                chebyshev = TMatrix.Chebyshev(m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
+                chebyshev = TMatrix.Chebyshev(; m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
 
                 T = TMatrix.calc_tmatrix!(chebyshev, Float64(ddelta), ndgs)
                 S, Z = TMatrix.calc_SZ(

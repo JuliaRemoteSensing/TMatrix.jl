@@ -207,12 +207,12 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
     Threads.@threads for nn in 0:(nmax * nmax - 1)
         n₂ = nn ÷ nmax + 1
         n₁ = nn % nmax + 1
-        for i in 1:ngss
-            τ₁τ₂ = τ[i][n₁] * τ[i][n₂]
-            d₁τ₂ = d[i][n₁] * τ[i][n₂]
-            d₂τ₁ = d[i][n₂] * τ[i][n₁]
+        if !(sym && (n₁ + n₂) % 2 == 1)
+            for i in 1:ngss
+                τ₁τ₂ = τ[i][n₁] * τ[i][n₂]
+                d₁τ₂ = d[i][n₁] * τ[i][n₂]
+                d₂τ₁ = d[i][n₂] * τ[i][n₁]
 
-            if !(sym && (n₁ + n₂) % 2 == 1)
                 J₁₂[n₁, n₂] +=
                     wr²[i] * jkₛr[i, n₂] * (dhkr[i, n₁] * τ₁τ₂ + drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
@@ -361,8 +361,8 @@ function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax
         n₁ = nn % nm + mm
         nn₂ = n₂ - mm + 1
         nn₁ = n₁ - mm + 1
-        for i in 1:ngss
-            if !(sym && (n₁ + n₂) % 2 == 0)
+        if !(sym && (n₁ + n₂) % 2 == 0)
+            for i in 1:ngss
                 pττp = p[i][n₁] * τ[i][n₂] + p[i][n₂] * τ[i][n₁]
                 p₁d₂ = p[i][n₁] * d[i][n₂]
 
@@ -386,8 +386,10 @@ function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax
                         p₁d₂
                     )
             end
+        end
 
-            if !(sym && (n₁ + n₂) % 2 == 1)
+        if !(sym && (n₁ + n₂) % 2 == 1)
+            for i in 1:ngss
                 ppττ = p[i][n₁] * p[i][n₂] + τ[i][n₁] * τ[i][n₂]
                 d₁τ₂ = d[i][n₁] * τ[i][n₂]
                 d₂τ₁ = d[i][n₂] * τ[i][n₁]

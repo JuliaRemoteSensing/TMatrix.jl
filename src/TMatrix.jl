@@ -1,9 +1,10 @@
 module TMatrix
 
 using Arblib
-import Dates: format, now, UTC
+using Dates: format, now, UTC
 using FastGaussQuadrature
 using LinearAlgebra
+using LoopVectorization
 using OffsetArrays
 using WignerD
 using WignerSymbols

@@ -2,6 +2,7 @@
 *.jl.cov
 *.jl.mem
 /docs/build/
+/*.jl
 
 .idea
 .vscode

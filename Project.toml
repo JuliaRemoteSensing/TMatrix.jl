@@ -1,24 +1,21 @@
+authors = ["Gabriel Wu <wuzihua@pku.edu.cn> and contributors"]
 name = "TMatrix"
 uuid = "9e67e5fd-3814-4bd7-98fc-5a25e7f54401"
-authors = ["Gabriel Wu <wuzihua@pku.edu.cn> and contributors"]
 version = "0.1.0"
+
+[compat]
+julia = "1.7"
 
 [deps]
 Arblib = "fb37089c-8514-4489-9461-98f9c8763369"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 FastGaussQuadrature = "442a2c76-b920-505d-bb47-c5924d526838"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+LoopVectorization = "bdcacae8-1622-11e9-2a5c-532679323890"
 OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
 TMatrix_jll = "f6676dc9-6ae6-5380-b4ed-33bd8634dc70"
 WignerD = "87c4ff3e-34df-11e9-37a7-516cea4e0402"
 WignerSymbols = "9f57e263-0b3d-5e2e-b1be-24f2bb48858b"
 
-[compat]
-julia = "1.6"
-
 [extras]
-BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[targets]
-test = ["Test"]
+CPUSummary = "2a0fbf3d-bb9c-48f3-b0a9-814d99fd7ab9"

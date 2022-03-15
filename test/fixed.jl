@@ -31,7 +31,7 @@
             (rev, a_to_c, ngauss) for rev in [0.5, 1.0, 2.0], a_to_c in [0.5, 1.0, 2.0], ngauss in [4, 20, 1000]
         ]
             @test begin
-                spheroid = TMatrix.Spheroid(m = m, a_to_c = a_to_c, rev = rev, λ = λ)
+                spheroid = TMatrix.Spheroid(; m = m, a_to_c = a_to_c, rev = rev, λ = λ)
                 r, dr = TMatrix.calc_r(spheroid, ngauss)
                 r², drr = TMatrix.Wrapper.Fixed.rsp1(ngauss, rev, a_to_c)
 
@@ -43,7 +43,7 @@
             (rev, r_to_h, ngauss) for rev in [0.5, 1.0, 2.0], r_to_h in [0.25, 0.5, 1.0], ngauss in [4, 20, 1000]
         ]
             @test begin
-                cylinder = TMatrix.Cylinder(m = m, r_to_h = r_to_h, rev = rev, λ = λ)
+                cylinder = TMatrix.Cylinder(; m = m, r_to_h = r_to_h, rev = rev, λ = λ)
                 r, dr = TMatrix.calc_r(cylinder, ngauss)
                 r², drr = TMatrix.Wrapper.Fixed.rsp3(ngauss, rev, 2r_to_h)
 
@@ -61,7 +61,7 @@
             ncheb in [2, 3, 4, 10]
         ]
             @test begin
-                chebyshev = TMatrix.Chebyshev(m = m, ε = ε, rev = rev, n = ncheb, λ = λ)
+                chebyshev = TMatrix.Chebyshev(; m = m, ε = ε, rev = rev, n = ncheb, λ = λ)
                 r, dr = TMatrix.calc_r(chebyshev, ngauss)
                 r², drr = TMatrix.Wrapper.Fixed.rsp2(ngauss, rev, ε, ncheb)
 
@@ -78,7 +78,7 @@
             (rea, a_to_c) for rea in [0.5, 1.0, 2.0], a_to_c in [0.5, 1.000001, 2.0]
         ]
             @test begin
-                spheroid = TMatrix.Spheroid(m = m, a_to_c = a_to_c, rea = rea, λ = λ)
+                spheroid = TMatrix.Spheroid(; m = m, a_to_c = a_to_c, rea = rea, λ = λ)
                 rev = TMatrix.volume_equivalent_radius(spheroid)
                 ratio = TMatrix.Wrapper.Fixed.sarea(a_to_c)
                 rev ≈ rea * ratio
@@ -89,7 +89,7 @@
             (rea, r_to_h) for rea in [0.5, 1.0, 2.0], r_to_h in [0.25, 0.5, 1.0]
         ]
             @test begin
-                cylinder = TMatrix.Cylinder(m = m, r_to_h = r_to_h, rea = rea, λ = λ)
+                cylinder = TMatrix.Cylinder(; m = m, r_to_h = r_to_h, rea = rea, λ = λ)
                 rev = TMatrix.volume_equivalent_radius(cylinder)
                 ratio = TMatrix.Wrapper.Fixed.sareac(2r_to_h)
                 rev ≈ rea * ratio
@@ -100,7 +100,7 @@
             (rea, ε, ncheb) for rea in [0.5, 1.0, 2.0], ε in [0.0, 0.1, 0.5], ncheb in [2, 3, 4, 10]
         ]
             @test begin
-                chebyshev = TMatrix.Chebyshev(m = m, ε = ε, rea = rea, n = ncheb, λ = λ)
+                chebyshev = TMatrix.Chebyshev(; m = m, ε = ε, rea = rea, n = ncheb, λ = λ)
                 rev = TMatrix.volume_equivalent_radius(chebyshev)
                 ratio = TMatrix.Wrapper.Fixed.surfch(ncheb, ε)
                 rev ≈ rea * ratio
@@ -117,7 +117,7 @@
             (a_to_c, nmax) for a_to_c in [0.5, 1.0, 2.0], nmax in [4, 10, 20]
         ]
             @test begin
-                spheroid = TMatrix.Spheroid(m = m, a_to_c = a_to_c, rev = rev, λ = λ)
+                spheroid = TMatrix.Spheroid(; m = m, a_to_c = a_to_c, rev = rev, λ = λ)
                 ngauss = nmax * 4
                 x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.Fixed.constant(ngauss, nmax, -1, a_to_c)
                 x0 = x0[1:ngauss]
@@ -135,7 +135,7 @@
             (r_to_h, nmax) for r_to_h in [0.25, 0.5, 1.0], nmax in [4, 10, 20]
         ]
             @test begin
-                cylinder = TMatrix.Cylinder(m = m, r_to_h = r_to_h, rev = rev, λ = λ)
+                cylinder = TMatrix.Cylinder(; m = m, r_to_h = r_to_h, rev = rev, λ = λ)
                 ngauss = nmax * 4
                 x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.Fixed.constant(ngauss, nmax, -2, 2r_to_h)
                 x0 = x0[1:ngauss]
@@ -153,7 +153,7 @@
             (ε, ncheb, nmax) for ε in [0.0, 0.1, 0.5], ncheb in [2, 3, 4, 10], nmax in [4, 10, 20]
         ]
             @test begin
-                chebyshev = TMatrix.Chebyshev(m = m, n = ncheb, ε = ε, rev = rev, λ = λ)
+                chebyshev = TMatrix.Chebyshev(; m = m, n = ncheb, ε = ε, rev = rev, λ = λ)
                 ngauss = nmax * 4
                 x0, w0, an0, ann0, s0, ss0 = TMatrix.Wrapper.Fixed.constant(ngauss, nmax, ncheb, ε)
                 x0 = x0[1:ngauss]
@@ -217,7 +217,7 @@
 
         @testset "for spheroids with a_to_c = $a_to_c" for a_to_c in [0.5, 1.0, 2.0]
             @test begin
-                spheroid = TMatrix.Spheroid(m = m, a_to_c = a_to_c, rev = rev, λ = λ)
+                spheroid = TMatrix.Spheroid(; m = m, a_to_c = a_to_c, rev = rev, λ = λ)
 
                 np = -1
                 x, _ = TMatrix.Wrapper.Fixed.constant(ngauss, nmax, np, a_to_c)
@@ -238,7 +238,7 @@
 
         @testset "for cylinders with r_to_h = $r_to_h" for r_to_h in [0.25, 0.5, 1.0]
             @test begin
-                cylinder = TMatrix.Cylinder(m = m, r_to_h = r_to_h, rev = rev, λ = λ)
+                cylinder = TMatrix.Cylinder(; m = m, r_to_h = r_to_h, rev = rev, λ = λ)
 
                 np = -2
                 x, _ = TMatrix.Wrapper.Fixed.constant(ngauss, nmax, np, 2r_to_h)
@@ -261,7 +261,7 @@
             (ε, ncheb) for ε in [0.0, 0.1, 0.5], ncheb in [2, 3, 4, 10]
         ]
             @test begin
-                chebyshev = TMatrix.Chebyshev(m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
+                chebyshev = TMatrix.Chebyshev(; m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
 
                 np = ncheb
                 x, _ = TMatrix.Wrapper.Fixed.constant(ngauss, nmax, np, ε)
@@ -290,7 +290,7 @@
 
         @testset "for spheroids with a_to_c = $a_to_c" for a_to_c in [0.5, 1.01, 2.0]
             @test begin
-                spheroid = TMatrix.Spheroid(m = m, a_to_c = a_to_c, rev = rev, λ = λ)
+                spheroid = TMatrix.Spheroid(; m = m, a_to_c = a_to_c, rev = rev, λ = λ)
 
                 np = -1
                 valid = true
@@ -314,7 +314,7 @@
 
         @testset "for cylinders with r_to_h = $r_to_h" for r_to_h in [0.25, 0.5, 1.0]
             @test begin
-                cylinder = TMatrix.Cylinder(m = m, r_to_h = r_to_h, rev = rev, λ = λ)
+                cylinder = TMatrix.Cylinder(; m = m, r_to_h = r_to_h, rev = rev, λ = λ)
 
                 np = -2
                 valid = true
@@ -340,7 +340,7 @@
             (ε, ncheb) for ε in [-0.15, 0.01, 0.1], ncheb in [2, 3, 4, 10]
         ]
             @test begin
-                chebyshev = TMatrix.Chebyshev(m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
+                chebyshev = TMatrix.Chebyshev(; m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
 
                 np = ncheb
                 valid = true
@@ -379,7 +379,7 @@
 
         @testset "for spheroids with a_to_c = $a_to_c" for a_to_c in [0.5, 1.01, 2.0]
             @test begin
-                spheroid = TMatrix.Spheroid(m = m, a_to_c = a_to_c, rev = rev, λ = λ)
+                spheroid = TMatrix.Spheroid(; m = m, a_to_c = a_to_c, rev = rev, λ = λ)
 
                 T = TMatrix.calc_tmatrix!(spheroid, ddelta, ndgs)
                 S, Z = TMatrix.calc_SZ(spheroid, α, β, ϑ_i, ϑ_s, φ_i, φ_s, T)
@@ -396,7 +396,7 @@
 
         @testset "for cylinders with r_to_h = $r_to_h" for r_to_h in [0.5, 1.0, 2.0]
             @test begin
-                cylinder = TMatrix.Cylinder(m = m, r_to_h = r_to_h, rev = rev, λ = λ)
+                cylinder = TMatrix.Cylinder(; m = m, r_to_h = r_to_h, rev = rev, λ = λ)
 
                 T = TMatrix.calc_tmatrix!(cylinder, ddelta, ndgs)
                 S, Z = TMatrix.calc_SZ(cylinder, α, β, ϑ_i, ϑ_s, φ_i, φ_s, T)
@@ -415,7 +415,7 @@
             (ε, ncheb) for ε in [-0.15, 0.01, 0.1], ncheb in [2, 3, 4]
         ]
             @test begin
-                chebyshev = TMatrix.Chebyshev(m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
+                chebyshev = TMatrix.Chebyshev(; m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
                 T = TMatrix.calc_tmatrix!(chebyshev, ddelta, ndgs)
                 S, Z = TMatrix.calc_SZ(chebyshev, α, β, ϑ_i, ϑ_s, φ_i, φ_s, T)
 
