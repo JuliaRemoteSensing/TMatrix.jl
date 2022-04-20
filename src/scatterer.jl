@@ -1042,8 +1042,8 @@ function update!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) wh
     rmax = maximum(info.r[1:ngauss])
     krmax = k * rmax
     tb = max(nmax, krmax * norm(scatterer.m))
-    nnmax1 = Int64(floor(8.0 * √(max(krmax, nmax)) + 3.0))
-    nnmax2 = Int64(floor(tb + 4.0 * ∛tb + 8.0 * √tb - nmax + 5))
+    nnmax1 = Int64(floor(max(krmax, nmax) - nmax + 8.0 * √(max(krmax, nmax)) + 3.0))
+    nnmax2 = Int64(floor(tb - nmax + 4.0 * ∛tb + 8.0 * √tb + 5))
 
     for i in 1:ngauss
         sphericalbesselj!(kr[i], nmax, nnmax1, view(info.jkr, i, :), view(info.djkr, i, :), info.j_tmp)
@@ -1150,6 +1150,7 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
     fill!(RgJ₁₂, zero(CT))
     fill!(RgJ₂₁, zero(CT))
 
+    # Threads.@threads 
     for nn in 0:(nmax * nmax - 1)
         n₂ = nn ÷ nmax + 1
         n₁ = nn % nmax + 1
@@ -1275,6 +1276,7 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
     OffsetRgJ₂₂ = OffsetArray(RgJ₂₂, mm:nmax, mm:nmax)
 
     nm = nmax - mm + 1
+    # Threads.@threads 
     for nn in 0:(nm * nm - 1)
         n₂ = nn ÷ nm + mm
         n₁ = nn % nm + mm

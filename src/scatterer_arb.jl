@@ -86,7 +86,7 @@ function update!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
     kr = ArbRefVector(ngauss)
     Arblib.mul!(kr, info.r, k)
     kₛr = AcbRefVector(ngauss)
-    Arblib.mul!(kₛr, AcbRefVector(kr), scatterer.m)
+    Arblib.mul!(kₛr, AcbRefVector(kr), Acb(scatterer.m))
 
     if ngauss != info.ngauss
         for i in 1:ngauss
@@ -116,7 +116,8 @@ function update!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
     info.jkₛr = AcbRefMatrix(ngauss, nmax)
     info.djkₛr = AcbRefMatrix(ngauss, nmax)
 
-    Threads.@threads for i in 1:ngauss
+    # Threads.@threads 
+    for i in 1:ngauss
         x1 = info.kr⁻¹[i]
         x_s1 = info.kₛr⁻¹[i]
         j0 = Arb(0)
@@ -179,7 +180,8 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
 
     d = [ArbRefVector(nmax) for _ in 1:ngauss]
     τ = [ArbRefVector(nmax) for _ in 1:ngauss]
-    Threads.@threads for i in (ngauss ÷ 2 + 1):ngauss
+    # Threads.@threads 
+    for i in (ngauss ÷ 2 + 1):ngauss
         ineg = ngauss + 1 - i
         vig!(nmax, 0, x[i], d[i], τ[i])
         @. d[ineg] = d[i] * sig
@@ -204,7 +206,8 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
     RgJ₁₂ = AcbRefMatrix(nmax, nmax)
     RgJ₂₁ = AcbRefMatrix(nmax, nmax)
 
-    Threads.@threads for nn in 0:(nmax * nmax - 1)
+    # Threads.@threads 
+    for nn in 0:(nmax * nmax - 1)
         n₂ = nn ÷ nmax + 1
         n₁ = nn % nmax + 1
         if !(sym && (n₁ + n₂) % 2 == 1)
@@ -237,7 +240,7 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
     k = 2 * Arb(π) / scatterer.λ
     kₛ = k * scatterer.m
     k² = Acb(k^2)
-    kkₛ = k * kₛ
+    kkₛ = Acb(k * kₛ)
 
     Q₁₁ = AcbRefMatrix(nmax, nmax)
     Q₁₂ = AcbRefMatrix(nmax, nmax)
@@ -324,7 +327,8 @@ function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax
     p = [ArbRefVector(nmax) for _ in 1:ngauss]
     τ = [ArbRefVector(nmax) for _ in 1:ngauss]
 
-    Threads.@threads for i in (ngauss ÷ 2 + 1):ngauss
+    # Threads.@threads 
+    for i in (ngauss ÷ 2 + 1):ngauss
         ineg = ngauss + 1 - i
         vig!(nmax, m, x[i], d[i], τ[i])
         @. p[i] = d[i] * s[i] * m
@@ -356,7 +360,8 @@ function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax
     RgJ₂₁ = AcbRefMatrix(nm, nm)
     RgJ₂₂ = AcbRefMatrix(nm, nm)
 
-    Threads.@threads for nn in 0:(nm * nm - 1)
+    # Threads.@threads 
+    for nn in 0:(nm * nm - 1)
         n₂ = nn ÷ nm + mm
         n₁ = nn % nm + mm
         nn₂ = n₂ - mm + 1
@@ -423,7 +428,7 @@ function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax
     k = 2 * Arb(π) / scatterer.λ
     kₛ = k * scatterer.m
     k² = Acb(k^2)
-    kkₛ = k * kₛ
+    kkₛ = Acb(k * kₛ)
 
     Q₁₁ = AcbRefMatrix(nm, nm)
     Q₁₂ = AcbRefMatrix(nm, nm)
