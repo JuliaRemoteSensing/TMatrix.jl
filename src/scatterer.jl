@@ -884,22 +884,22 @@ function calc_expansion_coefficients(TT::Vector{<:AbstractMatrix}, Csca::Real, �
     β₂ = 2imag.(g₀₂)
 
     # Validate the expansion coefficients
-    hovenr(α₁, α₂, α₃, α₄, β₁, β₂)
+    @debug hovenr(α₁, α₂, α₃, α₄, β₁, β₂)
 
     return α₁, α₂, α₃, α₄, β₁, β₂
 end
 
 @doc raw"""
 ```
-calc_scattering_matrix(α₁, α₂, α₃, α₄, β₁, β₂, Θ)
+calc_scattering_matrix(α₁, α₂, α₃, α₄, β₁, β₂, θ)
 ```
 
-Calculate the scatterering matrix from the given expansion coefficients.
+Calculate the scatterering matrix elements from the given expansion coefficients.
 
 Parameters:
 
 - `α₁`, `α₂`, `α₃`, `α₄`, `β₁`, `β₂`: The precalculated expansion coefficients.
-- `Θ`: The scattering angle in degrees.
+- `θ`: The scattering angle in degrees.
 """
 function calc_scattering_matrix(
     α₁::AbstractVector{T},
@@ -908,21 +908,44 @@ function calc_scattering_matrix(
     α₄::AbstractVector{T},
     β₁::AbstractVector{T},
     β₂::AbstractVector{T},
-    Θ::Real,
+    θ::Real,
 ) where {T<:Real}
     lmax = length(α₁) - 1
-    Θ = Float64(Θ) / 180 * π
+    θ = Float64(θ) / 180 * π
 
-    F₁₁ = sum(α₁[l] * WignerD.wignerdjmn(l, 0, 0, Θ) for l in 0:lmax)
-    F₂₂₊₃₃ = sum((α₂[l] + α₃[l]) * WignerD.wignerdjmn(l, 2, 2, Θ) for l in 2:lmax)
-    F₂₂₋₃₃ = sum((α₂[l] - α₃[l]) * WignerD.wignerdjmn(l, 2, -2, Θ) for l in 2:lmax)
+    F₁₁ = sum(α₁[l] * WignerD.wignerdjmn(l, 0, 0, θ) for l in 0:lmax)
+    F₂₂₊₃₃ = sum((α₂[l] + α₃[l]) * WignerD.wignerdjmn(l, 2, 2, θ) for l in 2:lmax)
+    F₂₂₋₃₃ = sum((α₂[l] - α₃[l]) * WignerD.wignerdjmn(l, 2, -2, θ) for l in 2:lmax)
     F₂₂ = (F₂₂₊₃₃ + F₂₂₋₃₃) / 2
     F₃₃ = F₂₂₊₃₃ - F₂₂
-    F₄₄ = sum(α₄[l] * WignerD.wignerdjmn(l, 0, 0, Θ) for l in 0:lmax)
-    F₁₂ = -sum(β₁[l] * WignerD.wignerdjmn(l, 0, 2, Θ) for l in 2:lmax)
-    F₃₄ = -sum(β₂[l] * WignerD.wignerdjmn(l, 0, 2, Θ) for l in 2:lmax)
+    F₄₄ = sum(α₄[l] * WignerD.wignerdjmn(l, 0, 0, θ) for l in 0:lmax)
+    F₁₂ = -sum(β₁[l] * WignerD.wignerdjmn(l, 0, 2, θ) for l in 2:lmax)
+    F₃₄ = -sum(β₂[l] * WignerD.wignerdjmn(l, 0, 2, θ) for l in 2:lmax)
 
-    return F₁₁, F₂₂, F₃₃, F₄₄, F₁₂, F₃₄
+    return F₁₁, F₁₂, F₂₂, F₃₃, F₃₄, F₄₄
+end
+
+@doc raw"""
+```
+calc_scattering_matrix(scatterer, TT, Nθ)
+```
+
+Calculate the scatterering matrix elements from the given scatterer and precalculated T-Matrix.
+
+Parameters:
+
+- `scatterer`: The scatterer.
+- `TT`: The T-Matrix.
+- `Nθ`: Number of θ intervals (so the result will have `Nθ + 1` rows).
+"""
+function calc_scattering_matrix(scatterer::AbstractScatterer, TT::Vector{<:AbstractMatrix}, Nθ::Integer)
+    Csca, _, _ = cross_section(TT, scatterer.λ)
+    α₁, α₂, α₃, α₄, β₁, β₂ = calc_expansion_coefficients(TT, Csca, scatterer.λ)
+
+    θ = Vector(range(0.0, 180.0, Nθ + 1))
+    data = hcat(θ, reduce(hcat, map(collect, map(θᵢ -> calc_scattering_matrix(α₁, α₂, α₃, α₄, β₁, β₂, θᵢ), θ)))')
+    df = DataFrame(data, ["θ", "s11", "s12", "s22", "s33", "s34", "s44"])
+    return df
 end
 
 function theta_split(scatterer::AbstractScatterer{T}, ngauss::Int64) where {T<:Real}
@@ -1150,8 +1173,7 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
     fill!(RgJ₁₂, zero(CT))
     fill!(RgJ₂₁, zero(CT))
 
-    # Threads.@threads 
-    for nn in 0:(nmax * nmax - 1)
+    Threads.@threads for nn in 0:(nmax * nmax - 1)
         n₂ = nn ÷ nmax + 1
         n₁ = nn % nmax + 1
         if !(sym && (n₁ + n₂) % 2 == 1)
@@ -1276,8 +1298,8 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
     OffsetRgJ₂₂ = OffsetArray(RgJ₂₂, mm:nmax, mm:nmax)
 
     nm = nmax - mm + 1
-    # Threads.@threads 
-    for nn in 0:(nm * nm - 1)
+
+    Threads.@threads for nn in 0:(nm * nm - 1)
         n₂ = nn ÷ nm + mm
         n₁ = nn % nm + mm
         if !(sym && (n₁ + n₂) % 2 == 0)

@@ -48,7 +48,6 @@ function Cylinder(
     rea = T(rea)
     r_to_h = T(r_to_h)
     λ = T(λ)
-    info = ScattererInfo(T)
 
     if !iszero(r) && !iszero(h)
         nothing
@@ -67,7 +66,7 @@ function Cylinder(
         r = h * r_to_h
     elseif !iszero(rmax) && !iszero(r_to_h)
         e = 2r_to_h
-        rev = axis_ratio > 1.0 ? r * ∛(R_3_2 / e) : r * ∛(R_3_2 * e^2)
+        rev = e > 1.0 ? rmax * ∛(R_3_2 / e) : rmax * ∛(R_3_2 * e^2)
         h = rev * ∛(4 / (3r_to_h^2))
         r = h * r_to_h
     else
