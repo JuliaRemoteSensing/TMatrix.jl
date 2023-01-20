@@ -6,6 +6,7 @@ using Dates: format, now, UTC
 using FastGaussQuadrature
 using LinearAlgebra
 using OffsetArrays
+using WignerD
 using WignerSymbols
 
 include("arb_compat.jl")
@@ -43,23 +44,14 @@ Base.size(tm::AxisymmetricTMatrix) = (tm.lmax, 2tm.lmax + 1, 2, tm.lmax, 2tm.lma
 Base.axes(tm::AxisymmetricTMatrix) = tm.axes
 
 function Base.getindex(tm::AxisymmetricTMatrix{T}, n::Int, m::Int, p::Int, n′::Int, m′::Int, q::Int) where {T}
-    (
-        (1 <= n <= tm.lmax) &&
-        (-tm.lmax <= m <= tm.lmax) &&
-        (1 <= p <= 2) &&
-        (1 <= n′ <= tm.lmax) &&
-        (-tm.lmax <= m′ <= tm.lmax) &&
-        (1 <= q <= 2)
-    ) || throw(BoundsError(tm, (n, m, p, n′, m′, q)))
-
-    if m != m′ || abs(m) > min(n, n′)
-        zero(T)
-    else
+    if m == m′ && abs(m) <= min(n, n′)
         ma = abs(m)
         n₀ = tm.lmax - max(1, ma) + 1
-        nn = p * n₀ + n - tm.lmax # FIXME: why do we need to invert here?
-        nn′ = q * n₀ + n′ - tm.lmax
+        nn = (3 - p) * n₀ + n - tm.lmax
+        nn′ = (3 - q) * n₀ + n′ - tm.lmax
         tm.internal[ma + 1][nn, nn′]
+    else
+        zero(T)
     end
 end
 

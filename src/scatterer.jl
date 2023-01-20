@@ -422,7 +422,7 @@ end
 
 @doc raw"""
 ```
-calc_amplitude(scatterer::AbstractScatterer{T}, α::T, β::T, ϑ_i::T, φ_i::T, ϑ_s::T, φ_s::T, TT::Vector{<:AbstractMatrix}) where {T<:Real}
+calc_amplitude(scatterer::AbstractScatterer{T}, α::T, β::T, ϑ_i::T, ϑ_s::T, φ_i::T, φ_s::T, TT::Vector{<:AbstractMatrix}) where {T<:Real}
 ```
 
 Calculate the amplitude matrix and the phase matrix, given the scatterer and the geometry of the incident and the scattered beam. Use pre-computed T-Matrix when possible.
@@ -651,7 +651,7 @@ calc_Z = calc_phase
 
 @doc raw"""
 ```
-calc_SZ(scatterer::AbstractScatterer{T}, α::T, β::T, ϑ_i::T, φ_i::T, ϑ_s::T, φ_s::T, TT::Vector{<:AbstractMatrix}) where {T<:Real}
+calc_SZ(scatterer::AbstractScatterer{T}, α::T, β::T, ϑ_i::T, ϑ_s::T, φ_i::T, φ_s::T, TT::Vector{<:AbstractMatrix}) where {T<:Real}
 ```
 
 Calculate the S matrix and the Z matrix sequentially.
@@ -889,6 +889,11 @@ function calc_expansion_coefficients(TT::Vector{<:AbstractMatrix}, Csca::Real, �
     return α₁, α₂, α₃, α₄, β₁, β₂
 end
 
+function calc_expansion_coefficients(scatterer::AbstractScatterer, TT)
+    csca, _ = cross_section(TT, scatterer.λ)
+    return calc_expansion_coefficients(TT, csca, scatterer.λ)
+end
+
 @doc raw"""
 ```
 calc_scattering_matrix(α₁, α₂, α₃, α₄, β₁, β₂, θ)
@@ -947,6 +952,8 @@ function calc_scattering_matrix(scatterer::AbstractScatterer, TT::Vector{<:Abstr
     df = DataFrame(data, ["θ", "s11", "s12", "s22", "s33", "s34", "s44"])
     return df
 end
+
+calc_F = calc_scattering_matrix
 
 function theta_split(scatterer::AbstractScatterer{T}, ngauss::Int64) where {T<:Real}
     x = zeros(ngauss)

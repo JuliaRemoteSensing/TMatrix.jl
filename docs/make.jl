@@ -13,7 +13,10 @@ makedocs(;
         canonical = "https://juliaremotesensing.github.io/TMatrix.jl",
         assets = String[],
     ),
-    pages = ["Home" => "index.md"],
+    pages = [
+        "Home" => "index.md"
+        "API" => "api.md"
+    ],
 )
 
 deploydocs(; repo = "github.com/JuliaRemoteSensing/TMatrix.jl", devbranch = "main")
