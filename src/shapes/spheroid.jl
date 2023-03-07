@@ -9,12 +9,12 @@ Attributes:
 - `λ`: The wavelength of the incident wave.
 - `info`: The accompanied information.
 """
-struct Spheroid{T<:Real,CT<:Number,RV,RM,CV,CM} <: AbstractScatterer{T,CT}
+struct Spheroid{T <: Real, CT <: Number, RV, RM, CV, CM} <: AbstractScatterer{T, CT}
     m::CT
     a::T
     c::T
     λ::T
-    info::ScattererInfo{RV,RM,CV,CM}
+    info::ScattererInfo{RV, RM, CV, CM}
 end
 
 @doc raw"""
@@ -30,17 +30,15 @@ Construct a spheroid. `λ` and `m` must be provided, and the size parameters are
 If none of the above is hit, an `ArgumentError` will be thrown.
 
 """
-function Spheroid(
-    T::Type{<:Real} = Float64;
-    a::Real = 0,
-    c::Real = 0,
-    rev::Real = 0,
-    rea::Real = 0,
-    rmax::Real = 0,
-    a_to_c::Real = 0,
-    m::Number,
-    λ::Real,
-)
+function Spheroid(T::Type{<:Real} = Float64;
+                  a::Real = 0,
+                  c::Real = 0,
+                  rev::Real = 0,
+                  rea::Real = 0,
+                  rmax::Real = 0,
+                  a_to_c::Real = 0,
+                  m::Number,
+                  λ::Real)
     m = Complex{T}(m)
     a = T(a)
     c = T(c)
@@ -90,14 +88,12 @@ has_symmetric_plane(spheroid::Spheroid) = true
 
 volume_equivalent_radius(spheroid::Spheroid) = ∛(spheroid.a^2 * spheroid.c)
 
-function calc_r!(
-    spheroid::Spheroid{T},
-    ngauss::Int64,
-    x::AbstractArray,
-    w::AbstractArray,
-    r::AbstractArray,
-    dr::AbstractArray,
-) where {T<:Real}
+function calc_r!(spheroid::Spheroid{T},
+                 ngauss::Int64,
+                 x::AbstractArray,
+                 w::AbstractArray,
+                 r::AbstractArray,
+                 dr::AbstractArray) where {T <: Real}
     theta_split!(spheroid, ngauss, x, w)
     e = spheroid.a / spheroid.c
     a = spheroid.a
@@ -112,21 +108,20 @@ function calc_r!(
     end
 end
 
-function theta_split!(spheroid::Spheroid{T}, ngauss::Int64, x::AbstractArray, w::AbstractArray) where {T<:Real}
+function theta_split!(spheroid::Spheroid{T}, ngauss::Int64, x::AbstractArray,
+                      w::AbstractArray) where {T <: Real}
     x0, w0 = gausslegendre(T, ngauss)
     x .= x0
     w .= w0
     return
 end
 
-function calc_r!(
-    spheroid::Spheroid{Arb},
-    ngauss::Int64,
-    x::Arblib.ArbVectorLike,
-    w::Arblib.ArbVectorLike,
-    r::Arblib.ArbVectorLike,
-    dr::Arblib.ArbVectorLike,
-)
+function calc_r!(spheroid::Spheroid{Arb},
+                 ngauss::Int64,
+                 x::Arblib.ArbVectorLike,
+                 w::Arblib.ArbVectorLike,
+                 r::Arblib.ArbVectorLike,
+                 dr::Arblib.ArbVectorLike)
     theta_split!(spheroid, ngauss, x, w)
 
     e = spheroid.a / spheroid.c
@@ -158,7 +153,8 @@ function calc_r!(
     end
 end
 
-function theta_split!(spheroid::Spheroid{Arb}, ngauss::Int64, x::Arblib.ArbVectorLike, w::Arblib.ArbVectorLike)
+function theta_split!(spheroid::Spheroid{Arb}, ngauss::Int64, x::Arblib.ArbVectorLike,
+                      w::Arblib.ArbVectorLike)
     gausslegendre!(Arb, ngauss, x, w)
     return
 end

@@ -24,20 +24,19 @@ setprecision(Arb, 128)
                 spheroid = TMatrix.Spheroid(; m = m, a_to_c = a_to_c, rev = rev, λ = λ)
 
                 T = TMatrix.calc_tmatrix!(spheroid, Float64(ddelta), ndgs)
-                S, Z = TMatrix.calc_SZ(
-                    spheroid,
-                    Float64(α),
-                    Float64(β),
-                    Float64(ϑ_i),
-                    Float64(ϑ_s),
-                    Float64(φ_i),
-                    Float64(φ_s),
-                    T,
-                )
+                S, Z = TMatrix.calc_SZ(spheroid,
+                                       Float64(α),
+                                       Float64(β),
+                                       Float64(ϑ_i),
+                                       Float64(ϑ_s),
+                                       Float64(φ_i),
+                                       Float64(φ_s),
+                                       T)
 
                 spheroid2 = TMatrix.Spheroid(Arb; m = m, a_to_c = a_to_c, rev = rev, λ = λ)
                 Ta = TMatrix.calc_tmatrix!(spheroid2, Arb(ddelta), ndgs)
-                Sa, Za = TMatrix.calc_SZ(spheroid2, Arb(α), Arb(β), Arb(ϑ_i), Arb(ϑ_s), Arb(φ_i), Arb(φ_s), Ta)
+                Sa, Za = TMatrix.calc_SZ(spheroid2, Arb(α), Arb(β), Arb(ϑ_i), Arb(ϑ_s),
+                                         Arb(φ_i), Arb(φ_s), Ta)
 
                 all(isapprox.(T, Ta, rtol = RTOL, atol = ATOL)) &&
                     all(isapprox.(S, Sa, rtol = RTOL, atol = ATOL)) &&
@@ -50,20 +49,19 @@ setprecision(Arb, 128)
                 cylinder = TMatrix.Cylinder(; m = m, r_to_h = r_to_h, rev = rev, λ = λ)
 
                 T = TMatrix.calc_tmatrix!(cylinder, Float64(ddelta), ndgs)
-                S, Z = TMatrix.calc_SZ(
-                    cylinder,
-                    Float64(α),
-                    Float64(β),
-                    Float64(ϑ_i),
-                    Float64(ϑ_s),
-                    Float64(φ_i),
-                    Float64(φ_s),
-                    T,
-                )
+                S, Z = TMatrix.calc_SZ(cylinder,
+                                       Float64(α),
+                                       Float64(β),
+                                       Float64(ϑ_i),
+                                       Float64(ϑ_s),
+                                       Float64(φ_i),
+                                       Float64(φ_s),
+                                       T)
 
                 cylinder2 = TMatrix.Cylinder(Arb; m = m, r_to_h = r_to_h, rev = rev, λ = λ)
                 Ta = TMatrix.calc_tmatrix!(cylinder2, Arb(ddelta), ndgs)
-                Sa, Za = TMatrix.calc_SZ(cylinder2, Arb(α), Arb(β), Arb(ϑ_i), Arb(ϑ_s), Arb(φ_i), Arb(φ_s), Ta)
+                Sa, Za = TMatrix.calc_SZ(cylinder2, Arb(α), Arb(β), Arb(ϑ_i), Arb(ϑ_s),
+                                         Arb(φ_i), Arb(φ_s), Ta)
 
                 all(isapprox.(T, Ta, rtol = RTOL, atol = ATOL)) &&
                     all(isapprox.(S, Sa, rtol = RTOL, atol = ATOL)) &&
@@ -71,27 +69,39 @@ setprecision(Arb, 128)
             end
         end
 
-        @testset "for Chebyshev particles with ε = $ε and ncheb = $ncheb" for (ε, ncheb) in [
-            (ε, ncheb) for ε in [-3 // 20, 1 // 100, 1 // 10], ncheb in [2, 3, 4]
-        ]
+        @testset "for Chebyshev particles with ε = $ε and ncheb = $ncheb" for (ε, ncheb) in [(ε,
+                                                                                              ncheb)
+                                                                                             for ε in [
+                                                                                                     -3 //
+                                                                                                     20,
+                                                                                                     1 //
+                                                                                                     100,
+                                                                                                     1 //
+                                                                                                     10,
+                                                                                                 ],
+                                                                                                 ncheb in [
+                                                                                                     2,
+                                                                                                     3,
+                                                                                                     4,
+                                                                                                 ]]
             @test begin
                 chebyshev = TMatrix.Chebyshev(; m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
 
                 T = TMatrix.calc_tmatrix!(chebyshev, Float64(ddelta), ndgs)
-                S, Z = TMatrix.calc_SZ(
-                    chebyshev,
-                    Float64(α),
-                    Float64(β),
-                    Float64(ϑ_i),
-                    Float64(ϑ_s),
-                    Float64(φ_i),
-                    Float64(φ_s),
-                    T,
-                )
+                S, Z = TMatrix.calc_SZ(chebyshev,
+                                       Float64(α),
+                                       Float64(β),
+                                       Float64(ϑ_i),
+                                       Float64(ϑ_s),
+                                       Float64(φ_i),
+                                       Float64(φ_s),
+                                       T)
 
-                chebyshev2 = TMatrix.Chebyshev(Arb; m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
+                chebyshev2 = TMatrix.Chebyshev(Arb; m = m, ε = ε, n = ncheb, rev = rev,
+                                               λ = λ)
                 Ta = TMatrix.calc_tmatrix!(chebyshev2, Arb(ddelta), ndgs)
-                Sa, Za = TMatrix.calc_SZ(chebyshev2, Arb(α), Arb(β), Arb(ϑ_i), Arb(ϑ_s), Arb(φ_i), Arb(φ_s), Ta)
+                Sa, Za = TMatrix.calc_SZ(chebyshev2, Arb(α), Arb(β), Arb(ϑ_i), Arb(ϑ_s),
+                                         Arb(φ_i), Arb(φ_s), Ta)
 
                 all(isapprox.(T, Ta, rtol = RTOL, atol = ATOL)) &&
                     all(isapprox.(S, Sa, rtol = RTOL, atol = ATOL)) &&

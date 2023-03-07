@@ -14,26 +14,24 @@ Attributes:
 - `λ`: The wavelength of the incident wave.
 - `info`: The accompanied information.
 """
-struct Chebyshev{T<:Real,CT<:Number,RV,RM,CV,CM} <: AbstractScatterer{T,CT}
+struct Chebyshev{T <: Real, CT <: Number, RV, RM, CV, CM} <: AbstractScatterer{T, CT}
     m::CT
     r₀::T
     ε::T
     n::Int64
     λ::T
-    info::ScattererInfo{RV,RM,CV,CM}
+    info::ScattererInfo{RV, RM, CV, CM}
 end
 
-function Chebyshev(
-    T::Type{<:Real} = Float64;
-    r₀::Real = 0,
-    ε::Real,
-    n::Int64,
-    rev::Real = 0,
-    rea::Real = 0,
-    rmax::Real = 0,
-    m::Number,
-    λ::Real,
-)
+function Chebyshev(T::Type{<:Real} = Float64;
+                   r₀::Real = 0,
+                   ε::Real,
+                   n::Int64,
+                   rev::Real = 0,
+                   rea::Real = 0,
+                   rmax::Real = 0,
+                   m::Number,
+                   λ::Real)
     @assert -1 < ε < 1
 
     m = Complex{T}(m)
@@ -100,14 +98,12 @@ function volume_equivalent_radius(chebyshev::Chebyshev)
     return ∛a * chebyshev.r₀
 end
 
-function calc_r!(
-    scatterer::Chebyshev{T},
-    ngauss::Int64,
-    x::AbstractArray,
-    w::AbstractArray,
-    r::AbstractArray,
-    dr::AbstractArray,
-) where {T<:Real}
+function calc_r!(scatterer::Chebyshev{T},
+                 ngauss::Int64,
+                 x::AbstractArray,
+                 w::AbstractArray,
+                 r::AbstractArray,
+                 dr::AbstractArray) where {T <: Real}
     theta_split!(scatterer, ngauss, x, w)
     ε = scatterer.ε
     n = scatterer.n
@@ -120,21 +116,20 @@ function calc_r!(
     end
 end
 
-function theta_split!(scatterer::Chebyshev{T}, ngauss::Int64, x::AbstractArray, w::AbstractArray) where {T<:Real}
+function theta_split!(scatterer::Chebyshev{T}, ngauss::Int64, x::AbstractArray,
+                      w::AbstractArray) where {T <: Real}
     x0, w0 = gausslegendre(T, ngauss)
     x .= x0
     w .= w0
     return
 end
 
-function calc_r!(
-    scatterer::Chebyshev{Arb},
-    ngauss::Int64,
-    x::Arblib.ArbVectorLike,
-    w::Arblib.ArbVectorLike,
-    r::Arblib.ArbVectorLike,
-    dr::Arblib.ArbVectorLike,
-)
+function calc_r!(scatterer::Chebyshev{Arb},
+                 ngauss::Int64,
+                 x::Arblib.ArbVectorLike,
+                 w::Arblib.ArbVectorLike,
+                 r::Arblib.ArbVectorLike,
+                 dr::Arblib.ArbVectorLike)
     theta_split!(scatterer, ngauss, x, w)
     ε = scatterer.ε
     n = scatterer.n
@@ -158,7 +153,8 @@ function calc_r!(
     end
 end
 
-function theta_split!(scatterer::Chebyshev{Arb}, ngauss::Int64, x::Arblib.ArbVectorLike, w::Arblib.ArbVectorLike)
+function theta_split!(scatterer::Chebyshev{Arb}, ngauss::Int64, x::Arblib.ArbVectorLike,
+                      w::Arblib.ArbVectorLike)
     gausslegendre!(Arb, ngauss, x, w)
     return
 end

@@ -9,12 +9,12 @@ Attributes:
 - `λ`: The wavelength of the incident wave.
 - `info`: The accompanied information.
 """
-struct Cylinder{T<:Real,CT<:Number,RV,RM,CV,CM} <: AbstractScatterer{T,CT}
+struct Cylinder{T <: Real, CT <: Number, RV, RM, CV, CM} <: AbstractScatterer{T, CT}
     m::CT
     r::T
     h::T
     λ::T
-    info::ScattererInfo{RV,RM,CV,CM}
+    info::ScattererInfo{RV, RM, CV, CM}
 end
 
 @doc raw"""
@@ -30,17 +30,15 @@ Construct a cylinder. `λ` and `m` must be provided, and the size parameters are
 If none of the above is hit, an `ArgumentError` will be thrown.
 
 """
-function Cylinder(
-    T::Type{<:Real} = Float64;
-    r::Real = 0,
-    h::Real = 0,
-    r_to_h::Real = 0,
-    rev::Real = 0,
-    rea::Real = 0,
-    rmax::Real = 0,
-    m::Number,
-    λ::Real,
-)
+function Cylinder(T::Type{<:Real} = Float64;
+                  r::Real = 0,
+                  h::Real = 0,
+                  r_to_h::Real = 0,
+                  rev::Real = 0,
+                  rea::Real = 0,
+                  rmax::Real = 0,
+                  m::Number,
+                  λ::Real)
     m = Complex{T}(m)
     r = T(r)
     h = T(h)
@@ -87,14 +85,12 @@ calc_r!(scatterer::AbstractScatterer{T}, ngauss::Int64, x::AbstractArray{T}, w::
 
 Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` points for a given scatterer, in place.
 """
-function calc_r!(
-    scatterer::Cylinder{T},
-    ngauss::Int64,
-    x::AbstractArray,
-    w::AbstractArray,
-    r::AbstractArray,
-    dr::AbstractArray,
-) where {T<:Real}
+function calc_r!(scatterer::Cylinder{T},
+                 ngauss::Int64,
+                 x::AbstractArray,
+                 w::AbstractArray,
+                 r::AbstractArray,
+                 dr::AbstractArray) where {T <: Real}
     theta_split!(scatterer, ngauss, x, w)
     h = scatterer.h / 2
     d = scatterer.r
@@ -115,7 +111,8 @@ function calc_r!(
     end
 end
 
-function theta_split!(scatterer::Cylinder{T}, ngauss::Int64, x::AbstractArray, w::AbstractArray) where {T<:Real}
+function theta_split!(scatterer::Cylinder{T}, ngauss::Int64, x::AbstractArray,
+                      w::AbstractArray) where {T <: Real}
     ng = ngauss ÷ 2
     ng1 = ng ÷ 2
     ng2 = ng - ng1
@@ -131,14 +128,12 @@ function theta_split!(scatterer::Cylinder{T}, ngauss::Int64, x::AbstractArray, w
     return
 end
 
-function calc_r!(
-    scatterer::Cylinder{Arb},
-    ngauss::Int64,
-    x::Arblib.ArbVectorLike,
-    w::Arblib.ArbVectorLike,
-    r::Arblib.ArbVectorLike,
-    dr::Arblib.ArbVectorLike,
-)
+function calc_r!(scatterer::Cylinder{Arb},
+                 ngauss::Int64,
+                 x::Arblib.ArbVectorLike,
+                 w::Arblib.ArbVectorLike,
+                 r::Arblib.ArbVectorLike,
+                 dr::Arblib.ArbVectorLike)
     theta_split!(scatterer, ngauss, x, w)
     h = scatterer.h / 2
     d = scatterer.r
@@ -163,7 +158,8 @@ function calc_r!(
     end
 end
 
-function theta_split!(scatterer::Cylinder{Arb}, ngauss::Int64, x::Arblib.ArbVectorLike, w::Arblib.ArbVectorLike)
+function theta_split!(scatterer::Cylinder{Arb}, ngauss::Int64, x::Arblib.ArbVectorLike,
+                      w::Arblib.ArbVectorLike)
     ng = ngauss ÷ 2
     ng1 = ng ÷ 2
     ng2 = ng - ng1

@@ -8,47 +8,45 @@ const ACB_HALF = Acb(1 // 2)
 Constructor of `ScattererInfo` for `Arb`. Pre-assignment is not used, since `SubArray` does not work harmoniously with `ArbMatrix`.
 """
 function ScattererInfo(T::Type{Arb})
-    return ScattererInfo(
-        0,
-        0,
-        0,
-        0,
-        ArbRefVector(0),
-        ArbRefMatrix(0, 0),
-        ArbRefVector(0),
-        ArbRefVector(0),
-        ArbRefVector(0),
-        ArbRefVector(0),
-        ArbRefVector(0),
-        ArbRefVector(0),
-        ArbRefVector(0),
-        ArbRefVector(0),
-        ArbRefVector(0),
-        AcbRefVector(0),
-        ArbRefMatrix(0, 0),
-        ArbRefMatrix(0, 0),
-        ArbRefMatrix(0, 0),
-        ArbRefMatrix(0, 0),
-        ArbRefMatrix(0, 0),
-        ArbRefVector(0),
-        ArbRefMatrix(0, 0),
-        ArbRefMatrix(0, 0),
-        AcbRefMatrix(0, 0),
-        AcbRefMatrix(0, 0),
-        AcbRefMatrix(0, 0),
-        AcbRefMatrix(0, 0),
-        AcbRefVector(0),
-        AcbRefMatrix(0, 0),
-        AcbRefMatrix(0, 0),
-        AcbRefMatrix(0, 0),
-        AcbRefMatrix(0, 0),
-        AcbRefMatrix(0, 0),
-        AcbRefMatrix(0, 0),
-        AcbRefMatrix(0, 0),
-        AcbRefMatrix(0, 0),
-        AcbRefMatrix(0, 0),
-        AcbRefMatrix(0, 0),
-    )
+    return ScattererInfo(0,
+                         0,
+                         0,
+                         0,
+                         ArbRefVector(0),
+                         ArbRefMatrix(0, 0),
+                         ArbRefVector(0),
+                         ArbRefVector(0),
+                         ArbRefVector(0),
+                         ArbRefVector(0),
+                         ArbRefVector(0),
+                         ArbRefVector(0),
+                         ArbRefVector(0),
+                         ArbRefVector(0),
+                         ArbRefVector(0),
+                         AcbRefVector(0),
+                         ArbRefMatrix(0, 0),
+                         ArbRefMatrix(0, 0),
+                         ArbRefMatrix(0, 0),
+                         ArbRefMatrix(0, 0),
+                         ArbRefMatrix(0, 0),
+                         ArbRefVector(0),
+                         ArbRefMatrix(0, 0),
+                         ArbRefMatrix(0, 0),
+                         AcbRefMatrix(0, 0),
+                         AcbRefMatrix(0, 0),
+                         AcbRefMatrix(0, 0),
+                         AcbRefMatrix(0, 0),
+                         AcbRefVector(0),
+                         AcbRefMatrix(0, 0),
+                         AcbRefMatrix(0, 0),
+                         AcbRefMatrix(0, 0),
+                         AcbRefMatrix(0, 0),
+                         AcbRefMatrix(0, 0),
+                         AcbRefMatrix(0, 0),
+                         AcbRefMatrix(0, 0),
+                         AcbRefMatrix(0, 0),
+                         AcbRefMatrix(0, 0),
+                         AcbRefMatrix(0, 0))
 end
 
 function update!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
@@ -213,17 +211,21 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
                 d₁τ₂ = d[i][n₁] * τ[i][n₂]
                 d₂τ₁ = d[i][n₂] * τ[i][n₁]
 
-                J₁₂[n₁, n₂] +=
-                    wr²[i] * jkₛr[i, n₂] * (dhkr[i, n₁] * τ₁τ₂ + drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
+                J₁₂[n₁, n₂] += wr²[i] * jkₛr[i, n₂] *
+                               (dhkr[i, n₁] * τ₁τ₂ +
+                                drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                J₂₁[n₁, n₂] +=
-                    wr²[i] * hkr[i, n₁] * (djkₛr[i, n₂] * τ₁τ₂ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
+                J₂₁[n₁, n₂] += wr²[i] * hkr[i, n₁] *
+                               (djkₛr[i, n₂] * τ₁τ₂ +
+                                drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
 
-                RgJ₁₂[n₁, n₂] +=
-                    wr²[i] * jkₛr[i, n₂] * (djkr[i, n₁] * τ₁τ₂ + drr[i] * an[n₁] * jkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
+                RgJ₁₂[n₁, n₂] += wr²[i] * jkₛr[i, n₂] *
+                                 (djkr[i, n₁] * τ₁τ₂ +
+                                  drr[i] * an[n₁] * jkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                RgJ₂₁[n₁, n₂] +=
-                    wr²[i] * jkr[i, n₁] * (djkₛr[i, n₂] * τ₁τ₂ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
+                RgJ₂₁[n₁, n₂] += wr²[i] * jkr[i, n₁] *
+                                 (djkₛr[i, n₂] * τ₁τ₂ +
+                                  drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
             end
         end
     end
@@ -286,16 +288,26 @@ function tmatr0!(scatterer::AbstractScatterer{Arb}, ngauss::Int64, nmax::Int64)
 
         if COLLECT_ACCURACY_INFO[]
             @debug begin
-                push!(ACCURACY_INFO[], ("d", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(d)))
-                push!(ACCURACY_INFO[], ("τ", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(τ)))
-                push!(ACCURACY_INFO[], ("J₁₂", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₁₂)))
-                push!(ACCURACY_INFO[], ("J₂₁", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₂₁)))
-                push!(ACCURACY_INFO[], ("RgJ₁₂", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₁₂)))
-                push!(ACCURACY_INFO[], ("RgJ₂₁", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₂₁)))
-                push!(ACCURACY_INFO[], ("RgQ", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgQ)))
-                push!(ACCURACY_INFO[], ("Q", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(Q)))
-                push!(ACCURACY_INFO[], ("inv(Q)", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(IQ)))
-                push!(ACCURACY_INFO[], ("T", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(T0)))
+                push!(ACCURACY_INFO[],
+                      ("d", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(d)))
+                push!(ACCURACY_INFO[],
+                      ("τ", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(τ)))
+                push!(ACCURACY_INFO[],
+                      ("J₁₂", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₁₂)))
+                push!(ACCURACY_INFO[],
+                      ("J₂₁", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₂₁)))
+                push!(ACCURACY_INFO[],
+                      ("RgJ₁₂", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₁₂)))
+                push!(ACCURACY_INFO[],
+                      ("RgJ₂₁", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₂₁)))
+                push!(ACCURACY_INFO[],
+                      ("RgQ", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgQ)))
+                push!(ACCURACY_INFO[],
+                      ("Q", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(Q)))
+                push!(ACCURACY_INFO[],
+                      ("inv(Q)", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(IQ)))
+                push!(ACCURACY_INFO[],
+                      ("T", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(T0)))
                 "Collecting accuracy info..."
             end
         end
@@ -368,23 +380,19 @@ function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax
 
                 J₁₁[nn₁, nn₂] += wr²[i] * hkr[i, n₁] * jkₛr[i, n₂] * pττp
 
-                J₂₂[nn₁, nn₂] +=
-                    wr²[i] * (
-                        dhkr[i, n₁] * djkₛr[i, n₂] * pττp +
-                        drr[i] *
-                        (an[n₁] * hkr[i, n₁] * kr⁻¹[i] * djkₛr[i, n₂] + an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * dhkr[i, n₁]) *
-                        p₁d₂
-                    )
+                J₂₂[nn₁, nn₂] += wr²[i] * (dhkr[i, n₁] * djkₛr[i, n₂] * pττp +
+                                  drr[i] *
+                                  (an[n₁] * hkr[i, n₁] * kr⁻¹[i] * djkₛr[i, n₂] +
+                                   an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * dhkr[i, n₁]) *
+                                  p₁d₂)
 
                 RgJ₁₁[nn₁, nn₂] += wr²[i] * jkr[i, n₁] * jkₛr[i, n₂] * pττp
 
-                RgJ₂₂[nn₁, nn₂] +=
-                    wr²[i] * (
-                        djkr[i, n₁] * djkₛr[i, n₂] * pττp +
-                        drr[i] *
-                        (an[n₁] * jkr[i, n₁] * kr⁻¹[i] * djkₛr[i, n₂] + an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * djkr[i, n₁]) *
-                        p₁d₂
-                    )
+                RgJ₂₂[nn₁, nn₂] += wr²[i] * (djkr[i, n₁] * djkₛr[i, n₂] * pττp +
+                                    drr[i] *
+                                    (an[n₁] * jkr[i, n₁] * kr⁻¹[i] * djkₛr[i, n₂] +
+                                     an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * djkr[i, n₁]) *
+                                    p₁d₂)
             end
         end
 
@@ -394,17 +402,21 @@ function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax
                 d₁τ₂ = d[i][n₁] * τ[i][n₂]
                 d₂τ₁ = d[i][n₂] * τ[i][n₁]
 
-                J₁₂[nn₁, nn₂] +=
-                    wr²[i] * jkₛr[i, n₂] * (dhkr[i, n₁] * ppττ + drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
+                J₁₂[nn₁, nn₂] += wr²[i] * jkₛr[i, n₂] *
+                                 (dhkr[i, n₁] * ppττ +
+                                  drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                J₂₁[nn₁, nn₂] +=
-                    wr²[i] * hkr[i, n₁] * (djkₛr[i, n₂] * ppττ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
+                J₂₁[nn₁, nn₂] += wr²[i] * hkr[i, n₁] *
+                                 (djkₛr[i, n₂] * ppττ +
+                                  drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
 
-                RgJ₁₂[nn₁, nn₂] +=
-                    wr²[i] * jkₛr[i, n₂] * (djkr[i, n₁] * ppττ + drr[i] * an[n₁] * jkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
+                RgJ₁₂[nn₁, nn₂] += wr²[i] * jkₛr[i, n₂] *
+                                   (djkr[i, n₁] * ppττ +
+                                    drr[i] * an[n₁] * jkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                RgJ₂₁[nn₁, nn₂] +=
-                    wr²[i] * jkr[i, n₁] * (djkₛr[i, n₂] * ppττ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
+                RgJ₂₁[nn₁, nn₂] += wr²[i] * jkr[i, n₁] *
+                                   (djkₛr[i, n₂] * ppττ +
+                                    drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
             end
         end
     end
@@ -488,21 +500,36 @@ function tmatr!(scatterer::AbstractScatterer{Arb}, m::Int64, ngauss::Int64, nmax
 
         if COLLECT_ACCURACY_INFO[]
             @debug begin
-                push!(ACCURACY_INFO[], ("d", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(d)))
-                push!(ACCURACY_INFO[], ("p", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(p)))
-                push!(ACCURACY_INFO[], ("τ", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(τ)))
-                push!(ACCURACY_INFO[], ("J₁₁", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₁₁)))
-                push!(ACCURACY_INFO[], ("J₁₂", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₁₂)))
-                push!(ACCURACY_INFO[], ("J₂₁", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₂₁)))
-                push!(ACCURACY_INFO[], ("J₂₂", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₂₂)))
-                push!(ACCURACY_INFO[], ("RgJ₁₁", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₁₁)))
-                push!(ACCURACY_INFO[], ("RgJ₁₂", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₁₂)))
-                push!(ACCURACY_INFO[], ("RgJ₂₁", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₂₁)))
-                push!(ACCURACY_INFO[], ("RgJ₂₂", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₂₂)))
-                push!(ACCURACY_INFO[], ("RgQ", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgQ)))
-                push!(ACCURACY_INFO[], ("Q", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(Q)))
-                push!(ACCURACY_INFO[], ("inv(Q)", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(IQ)))
-                push!(ACCURACY_INFO[], ("T", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(Tm)))
+                push!(ACCURACY_INFO[],
+                      ("d", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(d)))
+                push!(ACCURACY_INFO[],
+                      ("p", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(p)))
+                push!(ACCURACY_INFO[],
+                      ("τ", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(τ)))
+                push!(ACCURACY_INFO[],
+                      ("J₁₁", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₁₁)))
+                push!(ACCURACY_INFO[],
+                      ("J₁₂", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₁₂)))
+                push!(ACCURACY_INFO[],
+                      ("J₂₁", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₂₁)))
+                push!(ACCURACY_INFO[],
+                      ("J₂₂", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(J₂₂)))
+                push!(ACCURACY_INFO[],
+                      ("RgJ₁₁", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₁₁)))
+                push!(ACCURACY_INFO[],
+                      ("RgJ₁₂", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₁₂)))
+                push!(ACCURACY_INFO[],
+                      ("RgJ₂₁", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₂₁)))
+                push!(ACCURACY_INFO[],
+                      ("RgJ₂₂", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgJ₂₂)))
+                push!(ACCURACY_INFO[],
+                      ("RgQ", 0, nmax, ngauss, precision(Arb), rel_accuracy_bits(RgQ)))
+                push!(ACCURACY_INFO[],
+                      ("Q", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(Q)))
+                push!(ACCURACY_INFO[],
+                      ("inv(Q)", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(IQ)))
+                push!(ACCURACY_INFO[],
+                      ("T", mm, nmax, ngauss, precision(Arb), rel_accuracy_bits(Tm)))
                 "Collecting accuracy info..."
             end
 

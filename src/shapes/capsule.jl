@@ -9,18 +9,19 @@ Attributes:
 - `λ`: The wavelength of the incident wave.
 - `info`: The accompanied information.
 """
-struct Capsule{T<:Real,CT<:Number,RV,RM,CV,CM} <: AbstractScatterer{T,CT}
+struct Capsule{T <: Real, CT <: Number, RV, RM, CV, CM} <: AbstractScatterer{T, CT}
     m::CT
     r::T
     h::T
     λ::T
-    info::ScattererInfo{RV,RM,CV,CM}
+    info::ScattererInfo{RV, RM, CV, CM}
 end
 
 @doc raw"""
 Construct a capsule.
 """
-function Capsule(T::Type{<:Real} = Float64; r::Real = 1.0, h::Real = 1.0, m::Number = 1.0 + 0.0im, λ::Real = 1.0)
+function Capsule(T::Type{<:Real} = Float64; r::Real = 1.0, h::Real = 1.0,
+                 m::Number = 1.0 + 0.0im, λ::Real = 1.0)
     m = Complex{T}(m)
     r = T(r)
     h = T(h)
@@ -30,7 +31,9 @@ end
 
 has_symmetric_plane(capsule::Capsule) = true
 
-volume_equivalent_radius(capsule::Capsule) = ∛(capsule.r^3 / 2 + 3capsule.r^2 * capsule.h / 4)
+function volume_equivalent_radius(capsule::Capsule)
+    return ∛(capsule.r^3 / 2 + 3capsule.r^2 * capsule.h / 4)
+end
 
 @doc raw"""
 ```
@@ -39,14 +42,12 @@ calc_r!(scatterer::Capsule{T}, ngauss::Int64, x::AbstractArray{T}, w::AbstractAr
 
 Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` points for a given capsule, in place.
 """
-function calc_r!(
-    scatterer::Capsule{T},
-    ngauss::Int64,
-    x::AbstractArray,
-    w::AbstractArray,
-    r::AbstractArray,
-    dr::AbstractArray,
-) where {T<:Real}
+function calc_r!(scatterer::Capsule{T},
+                 ngauss::Int64,
+                 x::AbstractArray,
+                 w::AbstractArray,
+                 r::AbstractArray,
+                 dr::AbstractArray) where {T <: Real}
     theta_split!(scatterer, ngauss, x, w)
     d = scatterer.r
     h = scatterer.h / 2
@@ -70,7 +71,8 @@ function calc_r!(
     end
 end
 
-function theta_split!(scatterer::Capsule{T}, ngauss::Int64, x::AbstractArray, w::AbstractArray) where {T<:Real}
+function theta_split!(scatterer::Capsule{T}, ngauss::Int64, x::AbstractArray,
+                      w::AbstractArray) where {T <: Real}
     ng = ngauss ÷ 2
     ng1 = ng ÷ 2
     ng2 = ng - ng1

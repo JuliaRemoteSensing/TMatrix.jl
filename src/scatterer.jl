@@ -12,7 +12,7 @@ const DEFAULT_NGCAP = Ref{Int64}(500)
 const DEFAULT_NGCHEB = Ref{Int64}(60)
 const ARB_APPROX_INV = Ref{Bool}(false)
 const COLLECT_ACCURACY_INFO = Ref{Bool}(false)
-const ACCURACY_INFO = Ref{Array{Tuple{String,Int64,Int64,Int64,Int64,Int64}}}([])
+const ACCURACY_INFO = Ref{Array{Tuple{String, Int64, Int64, Int64, Int64, Int64}}}([])
 const FORCE_GC = Ref{Bool}(false)
 
 const Q_INVERSION_WARNING = "Failed to invert Q numerically, try increasing precision or ngauss."
@@ -84,7 +84,8 @@ function save_accuracy_info(filename::String)
         open(filename, "w") do io
             print(io, "item,m,nmax,ngauss,original_accuracy,accuracy\n")
             for (item, m, nmax, ngauss, original_accuracy, accuracy) in ACCURACY_INFO[]
-                print(io, item, ",", m, ",", nmax, ",", ngauss, ",", original_accuracy, ",", accuracy, "\n")
+                print(io, item, ",", m, ",", nmax, ",", ngauss, ",", original_accuracy, ",",
+                      accuracy, "\n")
             end
         end
         return "Accuracy info saved to $filename"
@@ -96,7 +97,8 @@ end
 @doc raw"""
 Accompanied information of a scatterer.
 """
-mutable struct ScattererInfo{RV<:AbstractVector,RM<:AbstractMatrix,CV<:AbstractVector,CM<:AbstractMatrix}
+mutable struct ScattererInfo{RV <: AbstractVector, RM <: AbstractMatrix,
+                             CV <: AbstractVector, CM <: AbstractMatrix}
     nmax::Int64
     ngauss::Int64
     ncap::Int64
@@ -142,53 +144,51 @@ end
 Constructor of `ScattererInfo` for general data types. Space is pre-allocated to reduce allocations.
 """
 function ScattererInfo(T::Type{<:Real})
-    return ScattererInfo(
-        0,
-        0,
-        DEFAULT_NCAP[],
-        DEFAULT_NGCAP[],
-        calc_an(T, DEFAULT_NCAP[]),
-        calc_ann(T, DEFAULT_NCAP[]),
-        calc_sig(T, DEFAULT_NCAP[]),
-        zeros(T, DEFAULT_NGCAP[]),
-        zeros(T, DEFAULT_NGCAP[]),
-        zeros(T, DEFAULT_NGCAP[]),
-        zeros(T, DEFAULT_NGCAP[]),
-        zeros(T, DEFAULT_NGCAP[]),
-        zeros(T, DEFAULT_NGCAP[]),
-        zeros(T, DEFAULT_NGCAP[]),
-        zeros(T, DEFAULT_NGCAP[]),
-        zeros(Complex{T}, DEFAULT_NGCAP[]),
-        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
-        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
-        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
-        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
-        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
-        zeros(T, 0),
-        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
-        zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
-        zeros(Complex{T}, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
-        zeros(Complex{T}, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
-        zeros(Complex{T}, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
-        zeros(Complex{T}, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
-        zeros(Complex{T}, 0),
-        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
-        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
-        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
-        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
-        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
-        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
-        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
-        zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
-        zeros(Complex{T}, 2DEFAULT_NCAP[], 2DEFAULT_NCAP[]),
-        zeros(Complex{T}, 2DEFAULT_NCAP[], 2DEFAULT_NCAP[]),
-    )
+    return ScattererInfo(0,
+                         0,
+                         DEFAULT_NCAP[],
+                         DEFAULT_NGCAP[],
+                         calc_an(T, DEFAULT_NCAP[]),
+                         calc_ann(T, DEFAULT_NCAP[]),
+                         calc_sig(T, DEFAULT_NCAP[]),
+                         zeros(T, DEFAULT_NGCAP[]),
+                         zeros(T, DEFAULT_NGCAP[]),
+                         zeros(T, DEFAULT_NGCAP[]),
+                         zeros(T, DEFAULT_NGCAP[]),
+                         zeros(T, DEFAULT_NGCAP[]),
+                         zeros(T, DEFAULT_NGCAP[]),
+                         zeros(T, DEFAULT_NGCAP[]),
+                         zeros(T, DEFAULT_NGCAP[]),
+                         zeros(Complex{T}, DEFAULT_NGCAP[]),
+                         zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+                         zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+                         zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+                         zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+                         zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+                         zeros(T, 0),
+                         zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+                         zeros(T, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+                         zeros(Complex{T}, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+                         zeros(Complex{T}, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+                         zeros(Complex{T}, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+                         zeros(Complex{T}, DEFAULT_NGCAP[], DEFAULT_NCAP[]),
+                         zeros(Complex{T}, 0),
+                         zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+                         zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+                         zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+                         zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+                         zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+                         zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+                         zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+                         zeros(Complex{T}, DEFAULT_NCAP[], DEFAULT_NCAP[]),
+                         zeros(Complex{T}, 2DEFAULT_NCAP[], 2DEFAULT_NCAP[]),
+                         zeros(Complex{T}, 2DEFAULT_NCAP[], 2DEFAULT_NCAP[]))
 end
 
 @doc raw"""
 Abstract type for all scatterers.
 """
-abstract type AbstractScatterer{T<:Real,CT<:Number} end
+abstract type AbstractScatterer{T <: Real, CT <: Number} end
 
 @doc raw"""
 ```
@@ -206,13 +206,11 @@ Parameters:
 - `ngstart`: Optional for manual setting of the initial value of `ngauss`. This parameter takes effect only if `nstart≠0`.
 
 """
-function tmatrix_routine_mishchenko(
-    scatterer::AbstractScatterer{T},
-    ddelta::T,
-    ndgs::Int64;
-    nstart::Int64 = 0,
-    ngstart::Int64 = nstart * ndgs,
-) where {T<:Real}
+function tmatrix_routine_mishchenko(scatterer::AbstractScatterer{T},
+                                    ddelta::T,
+                                    ndgs::Int64;
+                                    nstart::Int64 = 0,
+                                    ngstart::Int64 = nstart * ndgs) where {T <: Real}
     kr = 2 * T(π) * volume_equivalent_radius(scatterer) / scatterer.λ
     if nstart == 0
         nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
@@ -268,13 +266,13 @@ Parameters:
 - `ngstart`: Optional for manual setting of the initial value of `ngauss`. This parameter takes effect only if `nstart≠0`.
 
 """
-function tmatrix_routine_mishchenko_nmaxonly(
-    scatterer::AbstractScatterer{T},
-    ddelta::T,
-    ndgs::Int64;
-    nstart::Int64 = 0,
-    ngstart::Int64 = nstart * ndgs,
-) where {T<:Real}
+function tmatrix_routine_mishchenko_nmaxonly(scatterer::AbstractScatterer{T},
+                                             ddelta::T,
+                                             ndgs::Int64;
+                                             nstart::Int64 = 0,
+                                             ngstart::Int64 = nstart * ndgs) where {
+                                                                                    T <:
+                                                                                    Real}
     kr = 2 * T(π) * volume_equivalent_radius(scatterer) / scatterer.λ
     if nstart == 0
         nstart = max(4, Int64(floor(kr + 4.05 * ∛kr)))
@@ -317,16 +315,18 @@ Parameters:
 - `scatterer`: The scatterer.
 
 """
-function calc_tmatrix!(scatterer::AbstractScatterer{T}) where {T<:Real}
+function calc_tmatrix!(scatterer::AbstractScatterer{T}) where {T <: Real}
     return calc_tmatrix!(scatterer, T(1) / T(1000), 4)
 end
 
-function calc_tmatrix!(scatterer::AbstractScatterer{T}, t::Tuple{Int64,Int64,Function};) where {T<:Real}
+function calc_tmatrix!(scatterer::AbstractScatterer{T},
+                       t::Tuple{Int64, Int64, Function};) where {T <: Real}
     ngauss, nmax, routine = t
     return calc_tmatrix!(scatterer, ngauss, nmax, routine)
 end
 
-function calc_tmatrix!(scatterer::AbstractScatterer{T}, ddelta::T, ndgs::Int64;) where {T<:Real}
+function calc_tmatrix!(scatterer::AbstractScatterer{T}, ddelta::T,
+                       ndgs::Int64;) where {T <: Real}
     ngauss, nmax, routine = tmatrix_routine_mishchenko(scatterer, ddelta, ndgs)
     return calc_tmatrix!(scatterer, ngauss, nmax, routine)
 end
@@ -346,12 +346,10 @@ Parameters:
 - `routine`: The iteration routine function generated by a routine generator, internally or customly implemented.
 
 """
-function calc_tmatrix!(
-    scatterer::AbstractScatterer{T},
-    ngstart::Int64,
-    nstart::Int64,
-    routine::Function,
-) where {T<:Real}
+function calc_tmatrix!(scatterer::AbstractScatterer{T},
+                       ngstart::Int64,
+                       nstart::Int64,
+                       routine::Function) where {T <: Real}
     if T <: Arb
         @debug clear_accuracy_info()
     end
@@ -360,9 +358,8 @@ function calc_tmatrix!(
     while true
         T0, _ = tmatr0!(scatterer, ngauss, nmax)
         Qext = sum((2n + 1) * real(T0[n, n] + T0[n + nmax, n + nmax]) for n in 1:nmax)
-        Qsca = sum(
-            (2n + 1) * real(T0[n, n] * T0[n, n]' + T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]') for n in 1:nmax
-        )
+        Qsca = sum((2n + 1) * real(T0[n, n] * T0[n, n]' +
+                        T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]') for n in 1:nmax)
         @debug "Qsca = $Qsca, Qext = $Qext"
         nngauss, nnmax = routine(ngauss, nmax, Qsca, Qext)
         if nnmax == -1
@@ -377,12 +374,10 @@ function calc_tmatrix!(
     end
 end
 
-function calc_tmatrix!(
-    scatterer::AbstractScatterer{T},
-    ngauss::Int64,
-    nmax::Int64,
-    TT::Vector{<:AbstractMatrix},
-) where {T<:Real}
+function calc_tmatrix!(scatterer::AbstractScatterer{T},
+                       ngauss::Int64,
+                       nmax::Int64,
+                       TT::Vector{<:AbstractMatrix}) where {T <: Real}
     if length(TT) == 0
         @debug "Calculate T-Matrix for m = 0"
         T0, _ = tmatr0!(scatterer, ngauss, nmax)
@@ -410,7 +405,8 @@ function calc_tmatrix!(
     return TT
 end
 
-function calc_tmatrix!(scatterer::AbstractScatterer{T,CT}, ngauss::Int64, nmax::Int64) where {T<:Real,CT<:Number}
+function calc_tmatrix!(scatterer::AbstractScatterer{T, CT}, ngauss::Int64,
+                       nmax::Int64) where {T <: Real, CT <: Number}
     @debug "Calculate T-Matrix for m = 0"
     T0, _ = tmatr0!(scatterer, ngauss, nmax)
     if FORCE_GC[]
@@ -439,16 +435,14 @@ Parameters:
 
 > All the angles here are input in degrees.
 """
-function calc_amplitude(
-    scatterer::AbstractScatterer{T},
-    α::T,
-    β::T,
-    ϑ_i::T,
-    ϑ_s::T,
-    φ_i::T,
-    φ_s::T,
-    TT::Vector{<:AbstractMatrix},
-) where {T<:Real}
+function calc_amplitude(scatterer::AbstractScatterer{T},
+                        α::T,
+                        β::T,
+                        ϑ_i::T,
+                        ϑ_s::T,
+                        φ_i::T,
+                        φ_s::T,
+                        TT::Vector{<:AbstractMatrix}) where {T <: Real}
     # Validate the input angles
     @assert 0.0 <= α <= 360.0 &&
             0.0 <= β <= 180.0 &&
@@ -543,10 +537,10 @@ function calc_amplitude(
     D = 1.0 / (R1[1, 1] * R1[2, 2] - R1[1, 2] * R1[2, 1])
     R1 = D * [R1[2, 2] -R1[1, 2]; -R1[2, 1] R1[1, 1]]
 
-    CAL = [
-        Complex{T}((1.0im)^(j - i - 1) * √((2j + 1) * (2i + 1) / (i * j * (i + 1) * (j + 1)))) for i in 1:nmax,
-        j in 1:nmax
-    ]
+    CAL = [Complex{T}((1.0im)^(j - i - 1) *
+                      √(T(2j + 1) * (2i + 1) / (i * j * (i + 1) * (j + 1))))
+           for i in 1:nmax,
+               j in 1:nmax]
 
     φ = φ_q - φ_p
     VV = Complex{T}(0.0im)
@@ -620,12 +614,16 @@ function calc_phase(S::AbstractMatrix)
     @assert size(S) == (2, 2)
 
     Z = zeros(eltype(S), 4, 4)
-    Z[1, 1] = 0.5 * (S[1, 1] * S[1, 1]' + S[1, 2] * S[1, 2]' + S[2, 1] * S[2, 1]' + S[2, 2] * S[2, 2]')
-    Z[1, 2] = 0.5 * (S[1, 1] * S[1, 1]' - S[1, 2] * S[1, 2]' + S[2, 1] * S[2, 1]' - S[2, 2] * S[2, 2]')
+    Z[1, 1] = 0.5 * (S[1, 1] * S[1, 1]' + S[1, 2] * S[1, 2]' + S[2, 1] * S[2, 1]' +
+               S[2, 2] * S[2, 2]')
+    Z[1, 2] = 0.5 * (S[1, 1] * S[1, 1]' - S[1, 2] * S[1, 2]' + S[2, 1] * S[2, 1]' -
+               S[2, 2] * S[2, 2]')
     Z[1, 3] = -S[1, 1] * S[1, 2]' - S[2, 2] * S[2, 1]'
     Z[1, 4] = 1.0im * (S[1, 1] * S[1, 2]' - S[2, 2] * S[2, 1]')
-    Z[2, 1] = 0.5 * (S[1, 1] * S[1, 1]' + S[1, 2] * S[1, 2]' - S[2, 1] * S[2, 1]' - S[2, 2] * S[2, 2]')
-    Z[2, 2] = 0.5 * (S[1, 1] * S[1, 1]' - S[1, 2] * S[1, 2]' - S[2, 1] * S[2, 1]' + S[2, 2] * S[2, 2]')
+    Z[2, 1] = 0.5 * (S[1, 1] * S[1, 1]' + S[1, 2] * S[1, 2]' - S[2, 1] * S[2, 1]' -
+               S[2, 2] * S[2, 2]')
+    Z[2, 2] = 0.5 * (S[1, 1] * S[1, 1]' - S[1, 2] * S[1, 2]' - S[2, 1] * S[2, 1]' +
+               S[2, 2] * S[2, 2]')
     Z[2, 3] = -S[1, 1] * S[1, 2]' + S[2, 2] * S[2, 1]'
     Z[2, 4] = 1.0im * (S[1, 1] * S[1, 2]' + S[2, 2] * S[2, 1]')
     Z[3, 1] = -S[1, 1] * S[2, 1]' - S[2, 2] * S[1, 2]'
@@ -656,16 +654,14 @@ calc_SZ(scatterer::AbstractScatterer{T}, α::T, β::T, ϑ_i::T, ϑ_s::T, φ_i::T
 
 Calculate the S matrix and the Z matrix sequentially.
 """
-function calc_SZ(
-    scatterer::AbstractScatterer,
-    α::T,
-    β::T,
-    ϑ_i::T,
-    ϑ_s::T,
-    φ_i::T,
-    φ_s::T,
-    TT::Vector{<:AbstractMatrix},
-) where {T<:Real}
+function calc_SZ(scatterer::AbstractScatterer,
+                 α::T,
+                 β::T,
+                 ϑ_i::T,
+                 ϑ_s::T,
+                 φ_i::T,
+                 φ_s::T,
+                 TT::Vector{<:AbstractMatrix}) where {T <: Real}
     S = calc_S(scatterer, α, β, ϑ_i, ϑ_s, φ_i, φ_s, TT)
     Z = calc_Z(S)
 
@@ -829,12 +825,11 @@ function calc_expansion_coefficients(TT::Vector{<:AbstractMatrix}, Csca::Real, �
     end
 
     h_const = λ^2 / (Csca * 4 * π)
-    h = OffsetArray(
-        [s[l] * h_const * ss[n] / ss[n′] for l in 0:(2nmax), n in 1:nmax, n′ in 1:nmax],
-        0:(2nmax),
-        1:nmax,
-        1:nmax,
-    )
+    h = OffsetArray([s[l] * h_const * ss[n] / ss[n′]
+                     for l in 0:(2nmax), n in 1:nmax, n′ in 1:nmax],
+                    0:(2nmax),
+                    1:nmax,
+                    1:nmax)
 
     # Calculate g
     g₀₀ = OffsetArray(zeros(T, 2nmax + 1), 0:(2nmax))
@@ -906,15 +901,13 @@ Parameters:
 - `α₁`, `α₂`, `α₃`, `α₄`, `β₁`, `β₂`: The precalculated expansion coefficients.
 - `θ`: The scattering angle in degrees.
 """
-function calc_scattering_matrix(
-    α₁::AbstractVector{T},
-    α₂::AbstractVector{T},
-    α₃::AbstractVector{T},
-    α₄::AbstractVector{T},
-    β₁::AbstractVector{T},
-    β₂::AbstractVector{T},
-    θ::Real,
-) where {T<:Real}
+function calc_scattering_matrix(α₁::AbstractVector{T},
+                                α₂::AbstractVector{T},
+                                α₃::AbstractVector{T},
+                                α₄::AbstractVector{T},
+                                β₁::AbstractVector{T},
+                                β₂::AbstractVector{T},
+                                θ::Real) where {T <: Real}
     lmax = length(α₁) - 1
     θ = Float64(θ) / 180 * π
 
@@ -943,19 +936,23 @@ Parameters:
 - `TT`: The T-Matrix.
 - `Nθ`: Number of θ intervals (so the result will have `Nθ + 1` rows).
 """
-function calc_scattering_matrix(scatterer::AbstractScatterer, TT::Vector{<:AbstractMatrix}, Nθ::Integer)
+function calc_scattering_matrix(scatterer::AbstractScatterer, TT::Vector{<:AbstractMatrix},
+                                Nθ::Integer)
     Csca, _, _ = cross_section(TT, scatterer.λ)
     α₁, α₂, α₃, α₄, β₁, β₂ = calc_expansion_coefficients(TT, Csca, scatterer.λ)
 
     θ = Vector(range(0.0, 180.0, Nθ + 1))
-    data = hcat(θ, reduce(hcat, map(collect, map(θᵢ -> calc_scattering_matrix(α₁, α₂, α₃, α₄, β₁, β₂, θᵢ), θ)))')
+    data = hcat(θ,
+                reduce(hcat,
+                       map(collect,
+                           map(θᵢ -> calc_scattering_matrix(α₁, α₂, α₃, α₄, β₁, β₂, θᵢ), θ)))')
     df = DataFrame(data, ["θ", "s11", "s12", "s22", "s33", "s34", "s44"])
     return df
 end
 
 calc_F = calc_scattering_matrix
 
-function theta_split(scatterer::AbstractScatterer{T}, ngauss::Int64) where {T<:Real}
+function theta_split(scatterer::AbstractScatterer{T}, ngauss::Int64) where {T <: Real}
     x = zeros(ngauss)
     w = zeros(ngauss)
     theta_split!(scatterer, ngauss, x, w)
@@ -969,7 +966,7 @@ calc_r(scatterer::Scatterer, ngauss::Int64)
 
 Calculate $r(\theta)$ and $\frac{\mathrm{d}r}{\mathrm{d}\theta}$ at `ngauss` points for a given scatterer.
 """
-function calc_r(scatterer::AbstractScatterer{T}, ngauss::Int64) where {T<:Real}
+function calc_r(scatterer::AbstractScatterer{T}, ngauss::Int64) where {T <: Real}
     x = zeros(T, ngauss)
     w = zeros(T, ngauss)
     r = zeros(T, ngauss)
@@ -978,7 +975,8 @@ function calc_r(scatterer::AbstractScatterer{T}, ngauss::Int64) where {T<:Real}
     return r, dr
 end
 
-function update!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where {T<:Real}
+function update!(scatterer::AbstractScatterer{T}, ngauss::Int64,
+                 nmax::Int64) where {T <: Real}
     info = scatterer.info
 
     # No need to recalculate if both `ngauss` and `nmax` remains the same.
@@ -1046,14 +1044,12 @@ function update!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) wh
     k = 2 * T(π) / scatterer.λ
 
     if ngauss != info.ngauss
-        calc_r!(
-            scatterer,
-            ngauss,
-            view(info.x, 1:ngauss),
-            view(info.w, 1:ngauss),
-            view(info.r, 1:ngauss),
-            view(info.dr, 1:ngauss),
-        )
+        calc_r!(scatterer,
+                ngauss,
+                view(info.x, 1:ngauss),
+                view(info.w, 1:ngauss),
+                view(info.r, 1:ngauss),
+                view(info.dr, 1:ngauss))
     end
 
     kr = k * info.r[1:ngauss]
@@ -1076,13 +1072,17 @@ function update!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) wh
     nnmax2 = Int64(floor(tb - nmax + 4.0 * ∛tb + 8.0 * √tb + 5))
 
     for i in 1:ngauss
-        sphericalbesselj!(kr[i], nmax, nnmax1, view(info.jkr, i, :), view(info.djkr, i, :), info.j_tmp)
+        sphericalbesselj!(kr[i], nmax, nnmax1, view(info.jkr, i, :), view(info.djkr, i, :),
+                          info.j_tmp)
         sphericalbessely!(kr[i], nmax, view(info.ykr, i, :), view(info.dykr, i, :))
-        sphericalbesselj!(kₛr[i], nmax, nnmax2, view(info.jkₛr, i, :), view(info.djkₛr, i, :), info.j_s_tmp)
+        sphericalbesselj!(kₛr[i], nmax, nnmax2, view(info.jkₛr, i, :),
+                          view(info.djkₛr, i, :), info.j_s_tmp)
     end
 
-    view(info.hkr, 1:ngauss, 1:nmax) .= complex.(view(info.jkr, 1:ngauss, 1:nmax), view(info.ykr, 1:ngauss, 1:nmax))
-    view(info.dhkr, 1:ngauss, 1:nmax) .= complex.(view(info.djkr, 1:ngauss, 1:nmax), view(info.dykr, 1:ngauss, 1:nmax))
+    view(info.hkr, 1:ngauss, 1:nmax) .= complex.(view(info.jkr, 1:ngauss, 1:nmax),
+                                                 view(info.ykr, 1:ngauss, 1:nmax))
+    view(info.dhkr, 1:ngauss, 1:nmax) .= complex.(view(info.djkr, 1:ngauss, 1:nmax),
+                                                  view(info.dykr, 1:ngauss, 1:nmax))
 
     info.ngauss = ngauss
     info.nmax = nmax
@@ -1090,9 +1090,11 @@ function update!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) wh
     return
 end
 
-function constant(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where {T<:Real}
+function constant(scatterer::AbstractScatterer{T}, ngauss::Int64,
+                  nmax::Int64) where {T <: Real}
     an = [Float64(n * (n + 1)) for n in 1:nmax]
-    ann = [0.5 * √((2n₁ + 1) * (2n₂ + 1) / (n₁ * (n₁ + 1) * n₂ * (n₂ + 1))) for n₁ in 1:nmax, n₂ in 1:nmax]
+    ann = [0.5 * √((2n₁ + 1) * (2n₂ + 1) / (n₁ * (n₁ + 1) * n₂ * (n₂ + 1)))
+           for n₁ in 1:nmax, n₂ in 1:nmax]
 
     x = zeros(ngauss)
     w = zeros(ngauss)
@@ -1103,7 +1105,7 @@ function constant(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) w
     return x, w, an, ann, s, ss
 end
 
-function vary(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where {T<:Real}
+function vary(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where {T <: Real}
     r, dr = calc_r(scatterer, ngauss)
     λ = scatterer.λ
     k = 2 * T(π) / λ
@@ -1129,13 +1131,15 @@ function vary(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64) where
     for i in 1:ngauss
         sphericalbesselj!(kr[i], nmax, nnmax1, view(jkr, i, :), view(djkr, i, :), j_tmp)
         sphericalbessely!(kr[i], nmax, view(ykr, i, :), view(dykr, i, :))
-        sphericalbesselj!(kₛr[i], nmax, nnmax2, view(jkₛr, i, :), view(djkₛr, i, :), j_s_tmp)
+        sphericalbesselj!(kₛr[i], nmax, nnmax2, view(jkₛr, i, :), view(djkₛr, i, :),
+                          j_s_tmp)
     end
 
     return r, dr, kr⁻¹, kₛr⁻¹, jkr, djkr, ykr, dykr, jkₛr, djkₛr
 end
 
-function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) where {T<:Real}
+function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64,
+                 nmax::Int64;) where {T <: Real}
     @assert iseven(ngauss)
 
     CT = Complex{T}
@@ -1189,17 +1193,21 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
                 d₁τ₂ = d[i, n₁] * τ[i, n₂]
                 d₂τ₁ = d[i, n₂] * τ[i, n₁]
 
-                J₁₂[n₁, n₂] +=
-                    wr²[i] * jkₛr[i, n₂] * (dhkr[i, n₁] * τ₁τ₂ + drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
+                J₁₂[n₁, n₂] += wr²[i] * jkₛr[i, n₂] *
+                               (dhkr[i, n₁] * τ₁τ₂ +
+                                drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                J₂₁[n₁, n₂] +=
-                    wr²[i] * hkr[i, n₁] * (djkₛr[i, n₂] * τ₁τ₂ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
+                J₂₁[n₁, n₂] += wr²[i] * hkr[i, n₁] *
+                               (djkₛr[i, n₂] * τ₁τ₂ +
+                                drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
 
-                RgJ₁₂[n₁, n₂] +=
-                    wr²[i] * jkₛr[i, n₂] * (djkr[i, n₁] * τ₁τ₂ + drr[i] * an[n₁] * jkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
+                RgJ₁₂[n₁, n₂] += wr²[i] * jkₛr[i, n₂] *
+                                 (djkr[i, n₁] * τ₁τ₂ +
+                                  drr[i] * an[n₁] * jkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                RgJ₂₁[n₁, n₂] +=
-                    wr²[i] * jkr[i, n₁] * (djkₛr[i, n₂] * τ₁τ₂ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
+                RgJ₂₁[n₁, n₂] += wr²[i] * jkr[i, n₁] *
+                                 (djkₛr[i, n₂] * τ₁τ₂ +
+                                  drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
             end
         end
     end
@@ -1238,7 +1246,8 @@ function tmatr0!(scatterer::AbstractScatterer{T}, ngauss::Int64, nmax::Int64;) w
     return T0, Q, RgQ
 end
 
-function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::Int64;) where {T<:Real}
+function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64,
+                nmax::Int64;) where {T <: Real}
     @assert iseven(ngauss)
 
     sym = has_symmetric_plane(scatterer)
@@ -1316,23 +1325,19 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
 
                 OffsetJ₁₁[n₁, n₂] += wr²[i] * hkr[i, n₁] * jkₛr[i, n₂] * pττp
 
-                OffsetJ₂₂[n₁, n₂] +=
-                    wr²[i] * (
-                        dhkr[i, n₁] * djkₛr[i, n₂] * pττp +
-                        drr[i] *
-                        (an[n₁] * hkr[i, n₁] * kr⁻¹[i] * djkₛr[i, n₂] + an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * dhkr[i, n₁]) *
-                        p₁d₂
-                    )
+                OffsetJ₂₂[n₁, n₂] += wr²[i] * (dhkr[i, n₁] * djkₛr[i, n₂] * pττp +
+                                      drr[i] *
+                                      (an[n₁] * hkr[i, n₁] * kr⁻¹[i] * djkₛr[i, n₂] +
+                                       an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * dhkr[i, n₁]) *
+                                      p₁d₂)
 
                 OffsetRgJ₁₁[n₁, n₂] += wr²[i] * jkr[i, n₁] * jkₛr[i, n₂] * pττp
 
-                OffsetRgJ₂₂[n₁, n₂] +=
-                    wr²[i] * (
-                        djkr[i, n₁] * djkₛr[i, n₂] * pττp +
-                        drr[i] *
-                        (an[n₁] * jkr[i, n₁] * kr⁻¹[i] * djkₛr[i, n₂] + an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * djkr[i, n₁]) *
-                        p₁d₂
-                    )
+                OffsetRgJ₂₂[n₁, n₂] += wr²[i] * (djkr[i, n₁] * djkₛr[i, n₂] * pττp +
+                                        drr[i] *
+                                        (an[n₁] * jkr[i, n₁] * kr⁻¹[i] * djkₛr[i, n₂] +
+                                         an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * djkr[i, n₁]) *
+                                        p₁d₂)
             end
         end
 
@@ -1342,17 +1347,21 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
                 d₁τ₂ = d[i, n₁] * τ[i, n₂]
                 d₂τ₁ = d[i, n₂] * τ[i, n₁]
 
-                OffsetJ₁₂[n₁, n₂] +=
-                    wr²[i] * jkₛr[i, n₂] * (dhkr[i, n₁] * ppττ + drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
+                OffsetJ₁₂[n₁, n₂] += wr²[i] * jkₛr[i, n₂] *
+                                     (dhkr[i, n₁] * ppττ +
+                                      drr[i] * an[n₁] * hkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                OffsetJ₂₁[n₁, n₂] +=
-                    wr²[i] * hkr[i, n₁] * (djkₛr[i, n₂] * ppττ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
+                OffsetJ₂₁[n₁, n₂] += wr²[i] * hkr[i, n₁] *
+                                     (djkₛr[i, n₂] * ppττ +
+                                      drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
 
-                OffsetRgJ₁₂[n₁, n₂] +=
-                    wr²[i] * jkₛr[i, n₂] * (djkr[i, n₁] * ppττ + drr[i] * an[n₁] * jkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
+                OffsetRgJ₁₂[n₁, n₂] += wr²[i] * jkₛr[i, n₂] *
+                                       (djkr[i, n₁] * ppττ +
+                                        drr[i] * an[n₁] * jkr[i, n₁] * kr⁻¹[i] * d₁τ₂)
 
-                OffsetRgJ₂₁[n₁, n₂] +=
-                    wr²[i] * jkr[i, n₁] * (djkₛr[i, n₂] * ppττ + drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
+                OffsetRgJ₂₁[n₁, n₂] += wr²[i] * jkr[i, n₁] *
+                                       (djkₛr[i, n₂] * ppττ +
+                                        drr[i] * an[n₂] * jkₛr[i, n₂] * kₛr⁻¹[i] * d₂τ₁)
             end
         end
     end
@@ -1404,22 +1413,21 @@ function tmatr!(scatterer::AbstractScatterer{T}, m::Int64, ngauss::Int64, nmax::
     return Tm, Q, RgQ
 end
 
-function check_convergece(
-    scatterer::AbstractScatterer{T},
-    nmax::Int64,
-    ngauss::Int64,
-    ndgs::Int64,
-    ddelta::Real,
-) where {T<:Real}
+function check_convergence(scatterer::AbstractScatterer{T},
+                           nmax::Int64,
+                           ngauss::Int64,
+                           ndgs::Int64,
+                           ddelta::Real) where {T <: Real}
     T0, _ = tmatr0!(scatterer, ngauss, nmax)
     Qext = sum((2n + 1) * real(T0[n, n] + T0[n + nmax, n + nmax]) for n in 1:nmax)
-    Qsca = sum((2n + 1) * real(T0[n, n] * T0[n, n]' + T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]') for n in 1:nmax)
+    Qsca = sum((2n + 1) *
+               real(T0[n, n] * T0[n, n]' + T0[n + nmax, n + nmax] * T0[n + nmax, n + nmax]')
+               for n in 1:nmax)
 
     T0′, _ = tmatr0!(scatterer, ngauss + ndgs, nmax + 1)
     Qext′ = sum((2n + 1) * real(T0′[n, n] + T0′[n + nmax, n + nmax]) for n in 1:nmax)
-    Qsca′ = sum(
-        (2n + 1) * real(T0′[n, n] * T0′[n, n]' + T0′[n + nmax, n + nmax] * T0′[n + nmax, n + nmax]') for n in 1:nmax
-    )
+    Qsca′ = sum((2n + 1) * real(T0′[n, n] * T0′[n, n]' +
+                     T0′[n + nmax, n + nmax] * T0′[n + nmax, n + nmax]') for n in 1:nmax)
 
     ΔQext = abs((Qext - Qext′) / abs(Qext′))
     ΔQsca = abs((Qsca - Qsca′) / abs(Qsca′))

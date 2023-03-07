@@ -9,12 +9,12 @@ Attributes:
 - `λ`: The wavelength of the incident wave.
 - `info`: The accompanied information.
 """
-struct Bicone{T<:Real,CT<:Number,RV,RM,CV,CM} <: AbstractScatterer{T,CT}
+struct Bicone{T <: Real, CT <: Number, RV, RM, CV, CM} <: AbstractScatterer{T, CT}
     m::CT
     r::T
     h::T
     λ::T
-    info::ScattererInfo{RV,RM,CV,CM}
+    info::ScattererInfo{RV, RM, CV, CM}
 end
 
 @doc raw"""
@@ -32,14 +32,12 @@ has_symmetric_plane(bicone::Bicone) = true
 
 volume_equivalent_radius(bicone::Bicone) = ∛(bicone.r^2 * bicone.h / 2)
 
-function calc_r!(
-    scatterer::Bicone{T},
-    ngauss::Int64,
-    x::AbstractArray,
-    w::AbstractArray,
-    r::AbstractArray,
-    dr::AbstractArray,
-) where {T<:Real}
+function calc_r!(scatterer::Bicone{T},
+                 ngauss::Int64,
+                 x::AbstractArray,
+                 w::AbstractArray,
+                 r::AbstractArray,
+                 dr::AbstractArray) where {T <: Real}
     theta_split!(scatterer, ngauss, x, w)
     α = atan(scatterer.r / scatterer.h)
     h = scatterer.h
@@ -58,7 +56,8 @@ function calc_r!(
     end
 end
 
-function theta_split!(scatterer::Bicone{T}, ngauss::Int64, x::AbstractArray, w::AbstractArray) where {T<:Real}
+function theta_split!(scatterer::Bicone{T}, ngauss::Int64, x::AbstractArray,
+                      w::AbstractArray) where {T <: Real}
     ng = ngauss ÷ 2
     x1, w1 = gausslegendre(T, ng)
     @. x[1:ng] = 0.5(x1 - 1)

@@ -8,11 +8,11 @@ Attributes:
 - `λ`: The wavelength of the incident wave.
 - `info`: The accompanied information.
 """
-struct Bisphere{T<:Real,CT<:Number,RV,RM,CV,CM} <: AbstractScatterer{T,CT}
+struct Bisphere{T <: Real, CT <: Number, RV, RM, CV, CM} <: AbstractScatterer{T, CT}
     m::CT
     r::T
     λ::T
-    info::ScattererInfo{RV,RM,CV,CM}
+    info::ScattererInfo{RV, RM, CV, CM}
 end
 
 @doc raw"""
@@ -29,14 +29,12 @@ has_symmetric_plane(bicone::Bisphere) = true
 
 volume_equivalent_radius(bicone::Bisphere) = ∛2 * bicone.r
 
-function calc_r!(
-    scatterer::Bisphere{T},
-    ngauss::Int64,
-    x::AbstractArray,
-    w::AbstractArray,
-    r::AbstractArray,
-    dr::AbstractArray,
-) where {T<:Real}
+function calc_r!(scatterer::Bisphere{T},
+                 ngauss::Int64,
+                 x::AbstractArray,
+                 w::AbstractArray,
+                 r::AbstractArray,
+                 dr::AbstractArray) where {T <: Real}
     theta_split!(scatterer, ngauss, x, w)
 
     @simd for i in 1:(ngauss ÷ 2)
@@ -49,7 +47,8 @@ function calc_r!(
     end
 end
 
-function theta_split!(scatterer::Bisphere{T}, ngauss::Int64, x::AbstractArray, w::AbstractArray) where {T<:Real}
+function theta_split!(scatterer::Bisphere{T}, ngauss::Int64, x::AbstractArray,
+                      w::AbstractArray) where {T <: Real}
     ng = ngauss ÷ 2
     x1, w1 = gausslegendre(T, ng)
     @. x[1:ng] = 0.5(x1 - 1)

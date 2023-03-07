@@ -18,8 +18,10 @@
                 np = -1
                 TMatrix.Wrapper.Random.set_T!(T)
 
-                α₁, α₂, α₃, α₄, β₁, β₂ = TMatrix.calc_expansion_coefficients(T, Csca, spheroid.λ)
-                α₁′, α₂′, α₃′, α₄′, β₁′, β₂′, lmax = TMatrix.Wrapper.Random.gsp(nmax, Csca, spheroid.λ)
+                α₁, α₂, α₃, α₄, β₁, β₂ = TMatrix.calc_expansion_coefficients(T, Csca,
+                                                                             spheroid.λ)
+                α₁′, α₂′, α₃′, α₄′, β₁′, β₂′, lmax = TMatrix.Wrapper.Random.gsp(nmax, Csca,
+                                                                                spheroid.λ)
 
                 all(isapprox.(α₁[0:lmax], α₁′[0:lmax], rtol = RTOL, atol = ATOL)) &&
                     all(isapprox.(α₂[0:lmax], α₂′[0:lmax], rtol = RTOL, atol = ATOL)) &&
@@ -40,8 +42,10 @@
                 np = -2
                 TMatrix.Wrapper.Random.set_T!(T)
 
-                α₁, α₂, α₃, α₄, β₁, β₂ = TMatrix.calc_expansion_coefficients(T, Csca, cylinder.λ)
-                α₁′, α₂′, α₃′, α₄′, β₁′, β₂′, lmax = TMatrix.Wrapper.Random.gsp(nmax, Csca, cylinder.λ)
+                α₁, α₂, α₃, α₄, β₁, β₂ = TMatrix.calc_expansion_coefficients(T, Csca,
+                                                                             cylinder.λ)
+                α₁′, α₂′, α₃′, α₄′, β₁′, β₂′, lmax = TMatrix.Wrapper.Random.gsp(nmax, Csca,
+                                                                                cylinder.λ)
 
                 all(isapprox.(α₁[0:lmax], α₁′[0:lmax], rtol = RTOL, atol = ATOL)) &&
                     all(isapprox.(α₂[0:lmax], α₂′[0:lmax], rtol = RTOL, atol = ATOL)) &&
@@ -52,9 +56,18 @@
             end
         end
 
-        @testset "for Chebyshev particles with ε = $ε and ncheb = $ncheb" for (ε, ncheb) in [
-            (ε, ncheb) for ε in [-0.15, 0.01, 0.1], ncheb in [2, 3, 4]
-        ]
+        @testset "for Chebyshev particles with ε = $ε and ncheb = $ncheb" for (ε, ncheb) in [(ε,
+                                                                                              ncheb)
+                                                                                             for ε in [
+                                                                                                     -0.15,
+                                                                                                     0.01,
+                                                                                                     0.1,
+                                                                                                 ],
+                                                                                                 ncheb in [
+                                                                                                     2,
+                                                                                                     3,
+                                                                                                     4,
+                                                                                                 ]]
             @test begin
                 chebyshev = TMatrix.Chebyshev(; m = m, ε = ε, n = ncheb, rev = rev, λ = λ)
 
@@ -65,8 +78,10 @@
                 np = ncheb
                 TMatrix.Wrapper.Random.set_T!(T)
 
-                α₁, α₂, α₃, α₄, β₁, β₂ = TMatrix.calc_expansion_coefficients(T, Csca, chebyshev.λ)
-                α₁′, α₂′, α₃′, α₄′, β₁′, β₂′, lmax = TMatrix.Wrapper.Random.gsp(nmax, Csca, chebyshev.λ)
+                α₁, α₂, α₃, α₄, β₁, β₂ = TMatrix.calc_expansion_coefficients(T, Csca,
+                                                                             chebyshev.λ)
+                α₁′, α₂′, α₃′, α₄′, β₁′, β₂′, lmax = TMatrix.Wrapper.Random.gsp(nmax, Csca,
+                                                                                chebyshev.λ)
 
                 all(isapprox.(α₁[0:lmax], α₁′[0:lmax], rtol = RTOL, atol = ATOL)) &&
                     all(isapprox.(α₂[0:lmax], α₂′[0:lmax], rtol = RTOL, atol = ATOL)) &&

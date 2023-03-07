@@ -53,7 +53,8 @@ function calc_sig(T::Type{<:Arblib.ArbLike}, nmax::Int64)
     return sig
 end
 
-function vig!(nmax::Int64, m::Int64, x::T, dv1::AbstractArray{T}, dv2::AbstractArray{T}) where {T<:Real}
+function vig!(nmax::Int64, m::Int64, x::T, dv1::AbstractArray{T},
+              dv2::AbstractArray{T}) where {T <: Real}
     if x < -1 || x > 1 || abs(1.0 - abs(x)) < eps(x)
         error("Constraint violated: x ∈ (-1, 1)")
     end
@@ -99,14 +100,14 @@ function vig!(nmax::Int64, m::Int64, x::T, dv1::AbstractArray{T}, dv2::AbstractA
     end
 end
 
-function vig(nmax::Int64, m::Int64, x::T) where {T<:Real}
+function vig(nmax::Int64, m::Int64, x::T) where {T <: Real}
     dv1 = zeros(T, nmax)
     dv2 = zeros(T, nmax)
     vig!(nmax, m, x, dv1, dv2)
     return dv1, dv2
 end
 
-function vigampl(nmax::Int64, m::Int64, x::T) where {T<:Real}
+function vigampl(nmax::Int64, m::Int64, x::T) where {T <: Real}
     if abs(1.0 - abs(x)) < eps(x)
         if m != 1
             return zeros(T, nmax), zeros(T, nmax)
@@ -136,14 +137,12 @@ sphericalbesselj!(x::T, nmax::Int64, nnmax1::Int64, y::AbstractArray{T}, u::Abst
 
 Calculate spherical Bessel function $j_n(x)$ and $\frac{1}{x}\frac{\mathrm{d}}{\mathrm{d}x}[xj_n(x)]$ in place.
 """
-function sphericalbesselj!(
-    x::T,
-    nmax::Int64,
-    nnmax1::Int64,
-    y::AbstractArray{T},
-    u::AbstractArray{T},
-    z::AbstractArray{T},
-) where {T<:Number}
+function sphericalbesselj!(x::T,
+                           nmax::Int64,
+                           nnmax1::Int64,
+                           y::AbstractArray{T},
+                           u::AbstractArray{T},
+                           z::AbstractArray{T}) where {T <: Number}
     l = nmax + nnmax1
     x1 = one(x) / x
     if length(z) < l
@@ -165,7 +164,7 @@ function sphericalbesselj!(
     return
 end
 
-function sphericalbesselj(x::T, nmax::Int64, nnmax1::Int64) where {T<:Number}
+function sphericalbesselj(x::T, nmax::Int64, nnmax1::Int64) where {T <: Number}
     y = zeros(T, nmax)
     u = zeros(T, nmax)
     z = zeros(T, nmax + nnmax1)
@@ -173,7 +172,8 @@ function sphericalbesselj(x::T, nmax::Int64, nnmax1::Int64) where {T<:Number}
     return y, u
 end
 
-function sphericalbessely!(x::T, nmax::Int64, y::AbstractArray{T}, v::AbstractArray{T}) where {T<:Number}
+function sphericalbessely!(x::T, nmax::Int64, y::AbstractArray{T},
+                           v::AbstractArray{T}) where {T <: Number}
     x1 = one(x) / x
     y[1] = -cos(x) * x1^2 - sin(x) * x1
     y[2] = (-3x1^3 + x1) * cos(x) - 3x1^2 * sin(x)
@@ -186,7 +186,7 @@ function sphericalbessely!(x::T, nmax::Int64, y::AbstractArray{T}, v::AbstractAr
     end
 end
 
-function sphericalbessely(x::T, nmax::Int64) where {T<:Number}
+function sphericalbessely(x::T, nmax::Int64) where {T <: Number}
     y = zeros(T, nmax)
     v = zeros(T, nmax)
     sphericalbessely!(x, nmax, y, v)
@@ -202,11 +202,10 @@ function cross_section(TT::Vector{<:AbstractMatrix}, λ::Real)
         nn2 = n2 + nmax
         for n1 in 1:nmax
             nn1 = n1 + nmax
-            Qsca +=
-                TT[1][n1, n2] * TT[1][n1, n2]' +
-                TT[1][n1, nn2] * TT[1][n1, nn2]' +
-                TT[1][nn1, n2] * TT[1][nn1, n2]' +
-                TT[1][nn1, nn2] * TT[1][nn1, nn2]'
+            Qsca += TT[1][n1, n2] * TT[1][n1, n2]' +
+                    TT[1][n1, nn2] * TT[1][n1, nn2]' +
+                    TT[1][nn1, n2] * TT[1][nn1, n2]' +
+                    TT[1][nn1, nn2] * TT[1][nn1, nn2]'
         end
     end
     for n in 1:(2nmax)
@@ -219,13 +218,10 @@ function cross_section(TT::Vector{<:AbstractMatrix}, λ::Real)
             nn2 = n2 + nm
             for n1 in 1:nm
                 nn1 = n1 + nm
-                Qsca +=
-                    (
-                        TT[mm + 1][n1, n2] * TT[mm + 1][n1, n2]' +
-                        TT[mm + 1][n1, nn2] * TT[mm + 1][n1, nn2]' +
-                        TT[mm + 1][nn1, n2] * TT[mm + 1][nn1, n2]' +
-                        TT[mm + 1][nn1, nn2] * TT[mm + 1][nn1, nn2]'
-                    ) * 2.0
+                Qsca += (TT[mm + 1][n1, n2] * TT[mm + 1][n1, n2]' +
+                         TT[mm + 1][n1, nn2] * TT[mm + 1][n1, nn2]' +
+                         TT[mm + 1][nn1, n2] * TT[mm + 1][nn1, n2]' +
+                         TT[mm + 1][nn1, nn2] * TT[mm + 1][nn1, nn2]') * 2.0
             end
         end
 
@@ -304,7 +300,7 @@ function gausslegendre(T::Type{<:Real}, n::Integer)
     return z, w
 end
 
-function gausslegendre(T::Type{<:Union{Arb,ArbRef}}, n::Integer)
+function gausslegendre(T::Type{<:Union{Arb, ArbRef}}, n::Integer)
     x = ArbRefVector(n)
     w = ArbRefVector(n)
 
@@ -313,23 +309,26 @@ function gausslegendre(T::Type{<:Union{Arb,ArbRef}}, n::Integer)
     return x, w
 end
 
-function gausslegendre!(::Type{<:Union{Arb,ArbRef}}, n::Integer, x::Arblib.ArbVectorLike, w::Arblib.ArbVectorLike)
+function gausslegendre!(::Type{<:Union{Arb, ArbRef}}, n::Integer, x::Arblib.ArbVectorLike,
+                        w::Arblib.ArbVectorLike)
     for i in 1:(n ÷ 2)
-        Arblib.hypgeom_legendre_p_ui_root!(x[n + 1 - i], w[n + 1 - i], UInt64(n), UInt64(i - 1))
+        Arblib.hypgeom_legendre_p_ui_root!(x[n + 1 - i], w[n + 1 - i], UInt64(n),
+                                           UInt64(i - 1))
         x[i] = -x[n + 1 - i]
         w[i] = w[n + 1 - i]
     end
 
     if n % 2 == 1
-        Arblib.hypgeom_legendre_p_ui_root!(x[n ÷ 2 + 1], w[n ÷ 2 + 1], UInt64(n), UInt64(n ÷ 2))
+        Arblib.hypgeom_legendre_p_ui_root!(x[n ÷ 2 + 1], w[n ÷ 2 + 1], UInt64(n),
+                                           UInt64(n ÷ 2))
     end
 end
 
 function ccg(T::Type{<:Real}, n::Int64, n1::Int64, nmax::Int64, k1::Int64, k2::Int64)
     m_l = (k1 == 1 && k2 == 0) ? 0 : -n
 
-    return [
-        (m >= m_l && nn >= max(m * k1 + k2, n - n1)) ? clebschgordan(T, n, m, n1, m * (k1 - 1) + k2, nn) : zero(T) for
-        m in (-n):n, nn in 0:min(n + n1, nmax)
-    ]
+    return [(m >= m_l && nn >= max(m * k1 + k2, n - n1)) ?
+            clebschgordan(T, n, m, n1, m * (k1 - 1) + k2, nn) : zero(T)
+            for
+            m in (-n):n, nn in 0:min(n + n1, nmax)]
 end
