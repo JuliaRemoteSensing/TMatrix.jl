@@ -333,7 +333,7 @@ end
 
 @doc raw"""
 ```
-calc_tmatrix(scatterer::AbstractScatterer{T}, ngstart::Int64, nstart::Int64, routine::Function) where {T<:Real}
+calc_tmatrix!(scatterer::AbstractScatterer{T}, ngstart::Int64, nstart::Int64, routine::Function) where {T<:Real}
 ```
 
 Calculate the T-Matrix of the scatterer.
